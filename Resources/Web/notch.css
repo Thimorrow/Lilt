@@ -68,27 +68,13 @@ svg { display: block; }
 .focus-time{font-size:46px;font-weight:700;letter-spacing:-0.03em;line-height:1;font-variant-numeric:tabular-nums}
 .focus-note{font-size:14px;color:color-mix(in srgb,var(--notch-ink) 70%,transparent);line-height:1.35}
 .focus .controls{gap:4px}
-.shelf{grid-template-columns:1fr auto;column-gap:12px}
-.drop{display:flex;align-items:center;gap:12px;min-height:64px;width:100%;padding:10px 14px;border:1.5px dashed color-mix(in srgb,var(--notch-ink) 40%,transparent);border-radius:14px;background:transparent;text-align:left;cursor:pointer;line-height:1.3}
-.drop svg{width:26px;height:26px;flex:none}
-.drop small{display:block;color:color-mix(in srgb,var(--notch-ink) 70%,transparent);font-size:13px}
-.drop:hover,.notch.dragging .drop{border-color:var(--accent-3, #ffc94f);background:color-mix(in srgb,var(--notch-ink) 6%,transparent)}
-.files{display:flex;flex-wrap:nowrap;gap:8px;margin:0;padding:0;list-style:none;min-width:0;overflow:hidden}
-.files li{display:flex;align-items:center;gap:6px;flex:0 1 auto;min-width:0;padding:7px 11px;border-radius:10px;background:color-mix(in srgb,var(--notch-ink) 8%,transparent);font-size:14px}
-.files li.more{flex:none;font-weight:700;font-variant-numeric:tabular-nums}
-.files li svg{width:16px;height:16px;flex:none}
-.files li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:18ch}
-.shelf-actions{display:flex;gap:6px}
-.text-btn{min-height:44px;padding:0 12px;border:0;border-radius:999px;background:color-mix(in srgb,var(--notch-ink) 10%,transparent);color:inherit;cursor:pointer;font-size:14px;font-weight:600;transition:background-color 150ms ease-out,transform 150ms var(--ease-out)}
-.text-btn:active{transform:scale(0.96)}
-.text-btn:hover{background:color-mix(in srgb,var(--notch-ink) 18%,transparent)}
 .notch-foot{grid-area:3 / 1;display:flex;justify-content:space-between;align-items:center;gap:12px}
 .tabs{position:relative;isolation:isolate;display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:3px;border-radius:999px;background:color-mix(in srgb,var(--notch-ink) 8%,transparent)}
 .tabs::before{content:"";position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 10px) / 3);border-radius:inherit;background:var(--notch-ink);pointer-events:none;transform:translateX(calc(var(--tab-index,0) * (100% + 2px)));transition:transform 240ms cubic-bezier(.65,0,.35,1)}
 .tabs button{position:relative;display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 14px;border:0;border-radius:999px;background:transparent;font-size:13px;font-weight:600;letter-spacing:0.01em;color:var(--notch-ink);mix-blend-mode:difference;opacity:.7;cursor:pointer}
 .tabs button svg{width:16px;height:16px}
 .tabs button[aria-selected=true]{opacity:1}
-.tabs button:focus-visible,.notch .icon-btn:focus-visible,.notch .text-btn:focus-visible,.notch .drop:focus-visible,.settings-button:focus-visible{outline-color:var(--notch-ink)}
+.tabs button:focus-visible,.notch .icon-btn:focus-visible,.notch .drop:focus-visible,.settings-button:focus-visible{outline-color:var(--notch-ink)}
 .settings-button{display:grid;place-items:center;width:44px;min-height:44px;padding:0;border:0;border-radius:999px;background:transparent;color:color-mix(in srgb,var(--notch-ink) 70%,transparent);cursor:pointer;transition:background-color 140ms linear,color 140ms linear}
 .settings-button svg{width:17px;height:17px}
 .settings-button:hover{color:var(--notch-ink);background:color-mix(in srgb,var(--notch-ink) 8%,transparent)}
@@ -160,26 +146,6 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
 .focus-help{min-height:22px}
 .dot.is-error{background:#ff956b}
 .dot.is-complete{background:#a7e2a1}
-.shelf{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:minmax(0,1fr) auto;row-gap:2px;align-self:stretch}
-.shelf .drop{grid-column:1/-1;grid-row:1/-1}
-.files{grid-column:1;grid-row:1;display:flex;flex-direction:column;align-items:stretch;gap:3px;min-width:0;min-height:0;height:100%;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#474747 transparent;padding:2px 4px 2px 0}
-.files li{flex:0 0 38px;min-height:38px;padding:0;gap:0;align-items:stretch;border:1px solid transparent;border-radius:8px;background:#171717}
-.files li.is-selected{border-color:#c8beb3;background:#292724}
-.file-main{display:flex;align-items:center;gap:8px;min-width:0;flex:1;padding:3px 4px 3px 6px;text-align:left;border:0;border-radius:7px 0 0 7px;background:none;cursor:grab}
-.file-main:focus-visible,.file-menu:focus-visible{outline:2px solid var(--notch-ink);outline-offset:-2px}
-.file-main .file-icon{display:grid;place-items:center;flex:none;width:28px;height:28px;border-radius:5px;background:#333;overflow:hidden}
-.file-main .file-icon img{width:100%;height:100%;object-fit:cover}
-.file-main .file-details{display:block;min-width:0;max-width:none;overflow:hidden}
-.file-main strong,.file-main small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;line-height:1.2;font-weight:500}
-.file-main small{font-size:10px;color:#b2aaa2;font-weight:400}
-.file-main svg{width:18px;height:18px}
-.file-menu{flex:0 0 34px;min-height:36px;padding:0;border:0;border-radius:0 7px 7px 0;background:none;cursor:pointer;font-size:20px}
-.file-main:hover,.file-menu:hover{background:#333}
-.files li.is-missing{border-color:#734d3d}
-.files li.is-missing .file-main{cursor:pointer}
-.shelf-actions{grid-column:2;grid-row:1;flex-direction:column;gap:2px;align-self:center}
-.shelf-actions .text-btn{min-height:32px;font-size:12px;padding:0 8px}
-.shelf-note{grid-column:1/-1;grid-row:2;align-self:end;z-index:1;margin:0;padding:2px 4px;background:#000;font-size:10px;line-height:1.2;max-height:32px;overflow:auto;color:#ffb89b}
 
 .cover{display:grid;place-items:center;background:color-mix(in srgb,var(--notch-ink) 8%,transparent)}
 .cover img,.mini-cover img{display:block;width:100%;height:100%;object-fit:cover}
@@ -192,3 +158,48 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
 .music-note button{flex:none;padding:0;border:0;background:none;color:var(--notch-ink);font:inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .music-note button:focus-visible{outline-color:var(--notch-ink)}
 .music-note[hidden],.music-note button[hidden],.progress[hidden]{display:none}
+
+/* Shelf: quiet rows, hover-revealed actions and an in-notch menu instead of AppKit popups. */
+.shelf{position:relative;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:minmax(0,1fr) auto;column-gap:8px;row-gap:2px;align-self:stretch}
+.drop{grid-column:1/-1;grid-row:1/-1;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:10px 14px;border:1px dashed color-mix(in srgb,var(--notch-ink) 22%,transparent);border-radius:14px;background:transparent;color:color-mix(in srgb,var(--notch-ink) 70%,transparent);font-size:14px;line-height:1.3;cursor:pointer;transition:background-color 150ms ease-out,border-color 150ms ease-out,color 150ms ease-out}
+.drop svg{width:22px;height:22px;flex:none}
+.drop u{text-decoration-color:color-mix(in srgb,var(--notch-ink) 40%,transparent);text-underline-offset:3px}
+.drop:hover{background:color-mix(in srgb,var(--notch-ink) 5%,transparent);color:var(--notch-ink)}
+.notch.dragging .drop{border-color:var(--accent-3);background:color-mix(in srgb,var(--accent-3) 8%,transparent);color:var(--notch-ink)}
+.drop:focus-visible{outline-color:var(--notch-ink)}
+.shelf::after{content:"";position:absolute;inset:0;border:1px dashed var(--accent-3);border-radius:14px;background:color-mix(in srgb,var(--accent-3) 6%,transparent);opacity:0;pointer-events:none;transition:opacity 150ms ease-out}
+.notch.dragging .shelf:has(.files:not([hidden]))::after{opacity:1}
+.files{grid-column:1;grid-row:1;display:flex;flex-direction:column;gap:1px;margin:0;padding:2px 0 14px;list-style:none;min-width:0;min-height:0;height:100%;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;mask-image:linear-gradient(to bottom,#000 calc(100% - 16px),transparent)}
+.files:focus-visible{outline-offset:-2px}
+.files li{position:relative;display:flex;align-items:center;flex:0 0 36px;min-width:0;border-radius:9px;transition:background-color 120ms ease-out}
+.files li:hover{background:color-mix(in srgb,var(--notch-ink) 6%,transparent)}
+.files li.is-selected{background:color-mix(in srgb,var(--notch-ink) 13%,transparent)}
+.file-main{display:flex;align-items:center;gap:10px;flex:1;min-width:0;height:100%;padding:0 4px 0 6px;border:0;border-radius:inherit;background:none;color:inherit;text-align:left;cursor:default}
+.file-icon{display:grid;place-items:center;flex:none;width:26px;height:26px;border-radius:6px;background:color-mix(in srgb,var(--notch-ink) 12%,transparent);overflow:hidden;font-size:8px;font-weight:700;letter-spacing:.04em;line-height:1;color:color-mix(in srgb,var(--notch-ink) 75%,transparent)}
+.file-icon img{width:100%;height:100%;object-fit:cover}
+.file-icon svg{width:16px;height:16px}
+.file-details{display:block;min-width:0}
+.file-main strong,.file-main small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25}
+.file-main strong{font-size:13px;font-weight:500}
+.file-main small{font-size:11px;color:color-mix(in srgb,var(--notch-ink) 55%,transparent)}
+.files li.is-missing .file-icon,.files li.is-missing strong{opacity:.5}
+.files li.is-missing small{color:#ffb89b}
+.file-menu{display:grid;place-items:center;flex:none;width:30px;height:30px;margin-right:4px;padding:0;border:0;border-radius:8px;background:none;color:color-mix(in srgb,var(--notch-ink) 70%,transparent);cursor:pointer;opacity:0;transition:opacity 120ms ease-out,background-color 120ms ease-out,color 120ms ease-out}
+.file-menu svg{width:16px;height:16px}
+.files li:hover .file-menu,.files li.is-selected .file-menu,.file-menu:focus-visible,.file-menu[aria-expanded=true]{opacity:1}
+.file-menu:hover,.file-menu[aria-expanded=true]{background:color-mix(in srgb,var(--notch-ink) 12%,transparent);color:var(--notch-ink)}
+.file-main:focus-visible,.file-menu:focus-visible{outline:2px solid var(--notch-ink);outline-offset:-2px}
+.shelf-actions{grid-column:2;grid-row:1;display:flex;flex-direction:column;gap:2px;align-self:center}
+.shelf-actions .icon-btn{width:40px;height:40px;color:color-mix(in srgb,var(--notch-ink) 75%,transparent);transition:background-color 150ms ease-out,color 150ms ease-out,transform 150ms var(--ease-out)}
+.shelf-actions .icon-btn:hover{color:var(--notch-ink)}
+.shelf-actions .icon-btn svg{width:18px;height:18px}
+.shelf-actions .icon-btn:focus-visible{outline-color:var(--notch-ink);outline-offset:-2px}
+.shelf-note{grid-column:1/-1;grid-row:2;align-self:end;z-index:1;margin:0;padding:2px 4px;background:#000;font-size:11px;line-height:1.25;max-height:32px;overflow:auto;color:#ffb89b}
+.shelf-menu{position:absolute;z-index:3;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px;width:264px;padding:4px;border:1px solid color-mix(in srgb,var(--notch-ink) 14%,transparent);border-radius:12px;background:#1c1919;box-shadow:0 8px 20px rgb(0 0 0 / .4);color:var(--notch-ink)}
+.shelf-menu[inert]{pointer-events:none}
+.shelf-menu:focus{outline:0}
+.shelf-menu button{display:flex;align-items:center;width:100%;min-height:28px;padding:0 8px;border:0;border-radius:7px;background:none;color:inherit;font:inherit;font-size:13px;font-weight:500;line-height:1.2;text-align:left;white-space:nowrap;cursor:pointer}
+.shelf-menu button:hover:not(:disabled){background:color-mix(in srgb,var(--notch-ink) 9%,transparent)}
+.shelf-menu button:focus-visible{outline:2px solid var(--notch-ink);outline-offset:-2px}
+.shelf-menu button:disabled{color:color-mix(in srgb,var(--notch-ink) 35%,transparent);cursor:default}
+.shelf-menu [data-command=remove]{color:#ffb094}

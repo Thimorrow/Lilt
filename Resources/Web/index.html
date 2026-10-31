@@ -25,6 +25,9 @@
     <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h13m-5.5-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-wifi" viewBox="0 0 24 18"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2 6.5a14.5 14.5 0 0 1 20 0M5.5 10.2a9.4 9.4 0 0 1 13 0M9 13.8a4.3 4.3 0 0 1 6 0"/></g></symbol>
     <symbol id="i-battery" viewBox="0 0 34 16"><rect x="1" y="1.5" width="28" height="13" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="3.4" y="3.9" width="20" height="8.2" rx="1.6" fill="currentColor"/><path d="M31.2 5.6v4.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15M9.5 7V5.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1V7M6.5 7l.8 11.1a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4L17.5 7"/></g></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><g fill="currentColor"><circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/></g></symbol>
   </defs>
 </svg>
 <section class="notch" id="notch" data-state="compact" data-view="music" aria-label="Lilt UI preview">
@@ -63,10 +66,10 @@
           </div>
 
           <div class="view shelf" id="view-shelf" role="tabpanel" aria-labelledby="tab-shelf" hidden>
-            <button class="drop needs-js" type="button" data-action="choose"><svg aria-hidden="true"><use href="#i-shelf"/></svg><span>Drop files here, or choose some</span></button>
+            <button class="drop needs-js" type="button" data-action="choose"><svg aria-hidden="true"><use href="#i-shelf"/></svg><span>Drop files here or <u>choose</u></span></button>
             <ul class="files" data-live="files" aria-label="On the shelf" tabindex="0" hidden></ul>
             <p class="shelf-note" role="status" data-live="shelf-note" hidden></p>
-            <div class="shelf-actions needs-js" hidden><button class="text-btn" type="button" data-action="choose">Add</button><button class="text-btn" type="button" data-action="clear">Clear</button></div>
+            <div class="shelf-actions needs-js" hidden><button class="icon-btn" type="button" data-action="choose" aria-label="Add files" title="Add files"><svg aria-hidden="true"><use href="#i-plus"/></svg></button><button class="icon-btn" type="button" data-action="clear" aria-label="Clear Shelf" title="Clear Shelf"><svg aria-hidden="true"><use href="#i-trash"/></svg></button></div>
           </div>
 
           <div class="notch-foot needs-js">
@@ -77,6 +80,7 @@
             </div>
             <button class="settings-button" type="button" data-action="settings" aria-label="Open Lilt settings" title="Settings"><svg aria-hidden="true"><use href="#i-settings"/></svg></button>
           </div>
+          <div class="shelf-menu" role="menu" aria-label="File actions" tabindex="-1" hidden></div>
         </div>
 
       </section>

@@ -174,7 +174,10 @@ function renderShelf() {
     main.setAttribute('aria-pressed', String(shelfSelection.selected.has(file.id)));
     main.setAttribute('aria-label', `${file.name}, ${file.available ? file.location : 'File unavailable'}${file.retention === 'long' ? ', kept longer' : ''}`);
     main.title = `${file.name} · ${file.location}${file.available ? '' : ' · File unavailable'}`;
-    main.innerHTML = '<span class="file-icon"><svg aria-hidden="true"><use href="#i-file"/></svg></span><span class="file-details"><strong></strong><small></small></span>';
+    main.innerHTML = '<span class="file-icon" aria-hidden="true"></span><span class="file-details"><strong></strong><small></small></span>';
+    const kind = typeof file.kind === 'string' && /^[A-Z0-9]{1,4}$/.test(file.kind) ? file.kind : '';
+    if (kind) main.querySelector('.file-icon').textContent = kind;
+    else main.querySelector('.file-icon').innerHTML = '<svg><use href="#i-file"/></svg>';
     const thumbnail = typeof file.thumbnail === 'string' && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(file.thumbnail) && file.thumbnail.length <= 200000 ? file.thumbnail : null;
     if (thumbnail) {
       const image = document.createElement('img'); image.alt = ''; image.src = thumbnail;
@@ -182,6 +185,7 @@ function renderShelf() {
     }
     main.querySelector('strong').textContent = file.name;
     main.querySelector('small').textContent = file.available ? `${file.location}${file.retention === 'long' ? ' · Kept longer' : ''}` : 'File unavailable';
+    main.addEventListener('contextmenu', event => event.preventDefault());
     main.addEventListener('click', event => { if (event.detail < 2) shelfSelect(file.id, event); });
     main.addEventListener('dblclick', () => shelfCommand('open', file.id));
     main.addEventListener('dragstart', event => {
@@ -214,23 +218,30 @@ function renderShelf() {
     const menu = document.createElement('button');
     menu.type = 'button';
     menu.className = 'file-menu';
-    menu.textContent = '⋯';
+    menu.innerHTML = '<svg aria-hidden="true"><use href="#i-more"/></svg>';
+    menu.dataset.fileID = file.id;
     menu.setAttribute('aria-label', `Actions for ${file.name}`);
+    menu.setAttribute('aria-haspopup', 'menu');
+    menu.setAttribute('aria-expanded', 'false');
     const openMenu = event => {
       event.preventDefault();
       if (!shelfSelection.selected.has(file.id)) {
         const result = selectShelfItem(state.shelf.map(entry => entry.id), shelfSelection.selected, shelfSelection.anchor, file.id);
         shelfSelection.selected = result.selected; shelfSelection.anchor = result.anchor;
+        updateShelfSelection();
       }
+      const fromButton = event.type === 'click';
+      if (fromButton && shelfMenu.trigger === menu) { closeShelfMenu({ restoreFocus: event.detail === 0 }); return; }
       const rect = menu.getBoundingClientRect();
-      shelfCommand('menu', file.id, { ids: shelfIDs(), x: rect.x, y: rect.bottom });
-      updateShelfSelection();
+      openShelfMenu(shelfIDs(), fromButton ? { x: rect.right, y: rect.bottom + 4, alignRight: true } : { x: event.clientX, y: event.clientY },
+        { trigger: menu, keyboard: fromButton && event.detail === 0 });
     };
     menu.addEventListener('click', openMenu);
     item.addEventListener('contextmenu', openMenu);
     item.append(main, menu);
     return item;
   });
+  if (shelfMenu.trigger) closeShelfMenu({ animate: false });
   list.replaceChildren(...items);
   list.scrollTop = scroll;
   list.hidden = !items.length;
@@ -245,6 +256,91 @@ function renderShelf() {
 function shelfCommand(command, id, extra = {}) {
   native({ action: 'shelfAction', command, id, ...extra });
 }
+
+const shelfMenu = { ids: [], trigger: null };
+const shelfMenuElement = document.querySelector('.shelf-menu');
+
+function shelfMenuItems(ids) {
+  const available = state.shelf.filter(file => ids.includes(file.id)).every(file => file.available);
+  const single = ids.length === 1;
+  return [
+    ...(single ? [['preview', 'Quick Look', available], ['open', 'Open', available], ['reveal', 'Show in Finder', available]] : []),
+    ['share', 'Share…', available],
+    ['keep', 'Keep Longer', true],
+    ['remove', single ? 'Remove' : `Remove ${ids.length}`, true],
+  ];
+}
+
+// Two columns keep the menu inside the open notch and below the physical camera housing.
+function openShelfMenu(ids, point, { trigger, keyboard = false } = {}) {
+  if (!ids.length) return;
+  if (shelfMenu.trigger) shelfMenu.trigger.setAttribute('aria-expanded', 'false');
+  shelfMenu.ids = ids;
+  shelfMenu.trigger = trigger;
+  trigger.setAttribute('aria-expanded', 'true');
+  shelfMenuElement.replaceChildren(...shelfMenuItems(ids).map(([command, label, enabled]) => {
+    const item = document.createElement('button');
+    Object.assign(item, { type: 'button', role: 'menuitem', tabIndex: -1, disabled: !enabled });
+    item.dataset.command = command;
+    item.textContent = label;
+    return item;
+  }));
+  const wasHidden = shelfMenuElement.hidden;
+  shelfMenuElement.hidden = false;
+  const panel = document.querySelector('.notch-panel').getBoundingClientRect();
+  const width = shelfMenuElement.offsetWidth, height = shelfMenuElement.offsetHeight;
+  const left = Math.max(6, Math.min((point.alignRight ? point.x - width : point.x) - panel.left, panel.width - width - 6));
+  const hardware = parseFloat(getComputedStyle(notch).getPropertyValue('--hd')) || 32;
+  const top = Math.max(hardware + 4, Math.min(point.y - panel.top, panel.height - height - 6));
+  Object.assign(shelfMenuElement.style, { left: `${left}px`, top: `${top}px`, transformOrigin: `${point.x - panel.left - left}px ${point.y - panel.top - top}px` });
+  if (wasHidden) Object.assign(shelfMenuElement.style, { opacity: '0', transform: 'scale(.95)' });
+  animateMenu(shelfMenuElement, true, !keyboard);
+  const first = shelfMenuElement.querySelector('button:not(:disabled)');
+  if (keyboard) first?.focus({ preventScroll: true });
+  else shelfMenuElement.focus({ preventScroll: true });
+}
+
+function closeShelfMenu({ restoreFocus = false, animate = true } = {}) {
+  const trigger = shelfMenu.trigger;
+  if (!trigger) return;
+  shelfMenu.trigger = null;
+  trigger.setAttribute('aria-expanded', 'false');
+  animateMenu(shelfMenuElement, false, animate);
+  if (restoreFocus && trigger.isConnected) trigger.focus({ preventScroll: true });
+}
+
+function animateMenu(menu, open, animate) {
+  const style = getComputedStyle(menu);
+  const from = { opacity: style.opacity, transform: style.transform === 'none' ? 'scale(1)' : style.transform };
+  menuAnimations.get(menu)?.cancel();
+  menu.inert = !open;
+  const to = { opacity: open ? 1 : 0, transform: open ? 'scale(1)' : 'scale(.95)' };
+  Object.assign(menu.style, to);
+  const finish = () => { if (menu.inert) menu.hidden = true; };
+  if (!animate || reduced()) { finish(); return; }
+  const animation = menu.animate([from, to], { duration: open ? 200 : 150, easing: open ? 'cubic-bezier(.23,1,.32,1)' : 'ease-in' });
+  menuAnimations.set(menu, animation);
+  animation.finished.then(() => { if (menuAnimations.get(menu) === animation) { menuAnimations.delete(menu); finish(); } }, () => {});
+}
+
+shelfMenuElement.inert = true;
+shelfMenuElement.addEventListener('mousedown', event => { if (event.target.closest('button')) event.preventDefault(); });
+shelfMenuElement.addEventListener('click', event => {
+  const item = event.target.closest('button');
+  if (!item || item.disabled) return;
+  const ids = shelfMenu.ids;
+  const anchor = shelfMenu.trigger?.getBoundingClientRect();
+  closeShelfMenu({ restoreFocus: event.detail === 0, animate: event.detail > 0 });
+  shelfCommand(item.dataset.command, ids[0], { ids, x: anchor?.x ?? 250, y: anchor?.bottom ?? 100 });
+});
+shelfMenuElement.addEventListener('keydown', event => {
+  const items = [...shelfMenuElement.querySelectorAll('button:not(:disabled)')];
+  const index = items.indexOf(document.activeElement);
+  const next = { ArrowDown: index + 1, ArrowRight: index + 1, ArrowUp: index < 0 ? items.length - 1 : index - 1, ArrowLeft: index < 0 ? items.length - 1 : index - 1, Home: 0, End: items.length - 1 }[event.key];
+  if (next !== undefined) { event.preventDefault(); items[(next + items.length) % items.length]?.focus({ preventScroll: true }); return; }
+  if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeShelfMenu({ restoreFocus: true }); }
+  if (event.key === 'Tab') { event.preventDefault(); closeShelfMenu({ restoreFocus: true, animate: false }); }
+});
 
 function receiveShelfSnapshot(value) {
   if (!value || !Array.isArray(value.items)) return;
@@ -270,7 +366,7 @@ function clearSwipeMotion() {
   notch.classList.add('instant-view');
   notch.style.setProperty('--tab-index', VIEWS.indexOf(state.view));
   viewPanels.forEach(view => {
-    for (const property of ['transform', 'opacity', 'visibility', 'transition', 'will-change']) view.style.removeProperty(property);
+    for (const property of ['transform', 'opacity', 'filter', 'visibility', 'transition', 'will-change']) view.style.removeProperty(property);
   });
   void panel.offsetWidth;
   notch.classList.remove('instant-view');
@@ -281,7 +377,10 @@ function paintSwipe() {
   if (!motion) return;
   notch.style.setProperty('--tab-index', Math.max(0, Math.min(VIEWS.length - 1, motion.position / motion.width)));
   viewPanels.forEach((view, index) => {
-    view.style.transform = `translate3d(${index * motion.width - motion.position}px,0,0)`;
+    const offset = index * motion.width - motion.position;
+    const distance = Math.min(1, Math.abs(offset) / motion.width);
+    // Pages recede by fading and softening, never by scaling, so neighbours stay attached. One write per frame.
+    view.style.cssText = `transition:none;visibility:visible;will-change:transform,opacity,filter;transform:translate3d(${offset}px,0,0);opacity:${(1 - .5 * distance).toFixed(3)};filter:blur(${(2 * distance).toFixed(2)}px)`;
   });
 }
 
@@ -304,12 +403,6 @@ function beginSwipeMotion(index) {
   const renderedWidth = Math.max(1, current.getBoundingClientRect().width);
   swipeMotion = { width, scale: width / renderedWidth, position: index * width, velocity: 0, frame: 0, time: performance.now() };
   notch.classList.add('swiping');
-  viewPanels.forEach(view => {
-    view.style.transition = 'none';
-    view.style.visibility = 'visible';
-    view.style.opacity = '1';
-    view.style.willChange = 'transform';
-  });
   paintSwipe();
 }
 
@@ -345,6 +438,7 @@ function setView(view, { focus = false, animate = true, preserveSwipe = false } 
   if (!VIEWS.includes(view)) return;
   if (!preserveSwipe) clearSwipeMotion();
   closeFocusMenu({ animate: false });
+  closeShelfMenu({ animate: false });
   const index = VIEWS.indexOf(view);
   const instant = !animate || reduced() || !state.open;
   notch.classList.toggle('instant-view', instant);
@@ -400,7 +494,7 @@ function swipeGesture(phase, dx, dy, accepted, x, y, inputTime = performance.now
       cancelAnimationFrame(swipeMotion.frame);
       swipeMotion.frame = 0;
     }
-    gesture = { x: 0, y: 0, axis: null, index, origin: swipeMotion?.position ?? null };
+    gesture = { x: 0, y: 0, axis: null, index, origin: swipeMotion?.position ?? null, armed: false, resisting: false };
   }
   if (!gesture || !state.open || !Number.isFinite(dx) || !Number.isFinite(dy)) return;
   if (phase === 'begin' || phase === 'change') {
@@ -418,16 +512,24 @@ function swipeGesture(phase, dx, dy, accepted, x, y, inputTime = performance.now
     const proposed = gesture.origin - gesture.x * swipeMotion.scale;
     const lower = Math.max(0, gesture.index - 1) * swipeMotion.width;
     const upper = Math.min(VIEWS.length - 1, gesture.index + 1) * swipeMotion.width;
-    // At the outside edges, resistance makes the boundary tangible without wrapping.
+    // At the outside edges a rubber band (as on iOS) keeps following the finger with growing resistance.
     const bound = Math.max(lower, Math.min(upper, proposed));
     const overflow = proposed - bound;
-    swipeMotion.position = bound + Math.sign(overflow) * 36 * (1 - Math.exp(-Math.abs(overflow) / 120));
+    const reach = swipeMotion.width * .35;
+    swipeMotion.position = bound + Math.sign(overflow) * reach * (1 - 1 / (Math.abs(overflow) * .55 / reach + 1));
+    const resisting = Math.abs(overflow) >= 40 && (bound === 0 || bound === (VIEWS.length - 1) * swipeMotion.width);
+    if (resisting && !gesture.resisting) native({ action: 'swipeHaptic' });
+    gesture.resisting = resisting;
     const dt = swipeMotion.inputTime === undefined ? 0 : now - swipeMotion.inputTime;
     if (dt > 0 && dt < .1) {
       const weight = 1 - Math.exp(-dt / .035);
       swipeMotion.velocity += weight * ((swipeMotion.position - previous) / dt - swipeMotion.velocity);
     } else swipeMotion.velocity = 0;
     swipeMotion.inputTime = now;
+    // Mirrors the native 40-point commit threshold; the trackpad ticks only when a neighbour page exists.
+    const armed = Math.abs(gesture.x) >= 40 && VIEWS[gesture.index + (gesture.x < 0 ? 1 : -1)] !== undefined;
+    if (armed && !gesture.armed) native({ action: 'swipeHaptic' });
+    gesture.armed = armed;
     scheduleSwipePaint();
     return;
   }
@@ -446,7 +548,7 @@ function swipeGesture(phase, dx, dy, accepted, x, y, inputTime = performance.now
 
 function setOpen(open, { focus = false } = {}) {
   if (!open) clearSwipeMotion();
-  if (!open) closeFocusMenu({ animate: false });
+  if (!open) { closeFocusMenu({ animate: false }); closeShelfMenu({ animate: false }); }
   if (state.open === open) return;
   state.open = Boolean(open);
   notch.dataset.state = open ? 'open' : 'compact';
@@ -674,12 +776,14 @@ tabs.forEach((tab, index) => {
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape') {
     event.preventDefault();
-    if (focusMenu.kind) closeFocusMenu({ restoreFocus: true, animate: false });
+    if (shelfMenu.trigger) closeShelfMenu({ restoreFocus: true });
+    else if (focusMenu.kind) closeFocusMenu({ restoreFocus: true, animate: false });
     else setOpen(false, { focus: true });
   }
 });
 document.addEventListener('pointerdown', event => {
   if (focusMenu.kind && !event.target.closest('.focus-menu, .focus-trigger')) closeFocusMenu();
+  if (shelfMenu.trigger && !event.target.closest('.shelf-menu, .file-menu')) closeShelfMenu();
   if (!notch.contains(event.target) && state.open) setOpen(false);
 });
 document.querySelectorAll('.focus-trigger').forEach(trigger => trigger.addEventListener('keydown', event => {

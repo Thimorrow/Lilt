@@ -82,6 +82,7 @@ extension AppDelegate: WKScriptMessageHandler, WKNavigationDelegate {
             focus.configureIntervals(workMinutes: work.intValue, restMinutes: rest.intValue)
         case "focusIntervalsNext": focus.nextInterval()
         case "shelfAction": shelfAction(body)
+        case "swipeHaptic": NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         case "testFocus": diagnosticFixture(body)
         case "quit": quit()
         default: break

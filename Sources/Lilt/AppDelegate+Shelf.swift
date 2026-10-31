@@ -1,7 +1,7 @@
 import AppKit
 import Quartz
 
-// Shelf files, context menu, sharing and Quick Look.
+// Shelf files, sharing and Quick Look. The context menu is rendered by the web view.
 extension AppDelegate: QLPreviewPanelDataSource, QLPreviewPanelDelegate, NSSharingServicePickerDelegate {
     func chooseFiles() {
         selectingFiles = true
@@ -45,7 +45,6 @@ extension AppDelegate: QLPreviewPanelDataSource, QLPreviewPanelDelegate, NSShari
         guard Set(ids).count == ids.count, ids.allSatisfy({ known.contains($0) }) else { return }
         if action == "remove" { shelf.remove(ids); sendShelf(); return }
         if action == "keep" { shelf.keepLonger(ids, retentionDays: settings.value.shelfLongDays); sendShelf(); return }
-        if action == "menu" { showShelfMenu(ids: ids, body: body); return }
         let urls = ids.compactMap { shelf.resolvedURL(for: $0) }
         guard urls.count == ids.count else {
             shelf.report("Die Datei ist nicht mehr verfügbar. Du kannst ihren Eintrag entfernen und die Datei erneut hinzufügen.")
@@ -84,31 +83,6 @@ extension AppDelegate: QLPreviewPanelDataSource, QLPreviewPanelDelegate, NSShari
         default: return
         }
         sendShelf()
-    }
-
-    func showShelfMenu(ids: [String], body: [String: Any]) {
-        let menu = NSMenu()
-        let available = ids.allSatisfy { shelf.resolvedURL(for: $0) != nil }
-        var actions = ids.count == 1 ? [("Quick Look", "preview"), ("Open", "open"), ("Show in Finder", "reveal")] : []
-        actions += [("Keep Longer", "keep"), ("Share…", "share"), ("Remove from Shelf", "remove")]
-        for (title, command) in actions {
-            let item = NSMenuItem(title: title, action: #selector(shelfMenuAction(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = ["ids": ids, "command": command, "x": body["x"] ?? 250, "y": body["y"] ?? 100] as [String : Any]
-            item.isEnabled = available || command == "remove" || command == "keep"
-            menu.addItem(item)
-        }
-        menu.autoenablesItems = false
-        let x = body["x"] as? Double ?? 250
-        let y = body["y"] as? Double ?? 100
-        selectingFiles = true
-        menu.popUp(positioning: nil, at: NSPoint(x: x, y: webView.isFlipped ? y : webView.bounds.height - y), in: webView)
-        selectingFiles = sharingPicker != nil
-    }
-
-    @objc func shelfMenuAction(_ item: NSMenuItem) {
-        guard let command = item.representedObject as? [String: Any] else { return }
-        shelfAction(command)
     }
 
     func sharingServicePicker(_ sharingServicePicker: NSSharingServicePicker, didChoose service: NSSharingService?) {
