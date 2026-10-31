@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { freshMusic, elapsedAt, musicSnapshot, musicAction, clock } from '../Resources/Web/model.mjs';
+import { selectShelfItem } from '../Resources/Web/shelf-selection.mjs';
 
 const ready = extra => ({ ...freshMusic(), availability: 'ready', id: 'track', title: 'A song', duration: 120, elapsed: 15, canPlay: true, canPause: true, ...extra });
 
@@ -41,4 +42,18 @@ test('offline disables transport and buffering never advances playback time', ()
   assert.equal(buffering.playing, false);
   assert.equal(elapsedAt(buffering, 90000), 15);
   assert.equal(musicSnapshot(ready({ pending: 'play' }), 0).pending, 'play');
+});
+
+test('Shelf selection supports single, command and contiguous shift selections', () => {
+  const ids = ['a', 'b', 'c', 'd'];
+  let choice = selectShelfItem(ids, new Set(), null, 'b');
+  assert.deepEqual([...choice.selected], ['b']);
+  choice = selectShelfItem(ids, choice.selected, choice.anchor, 'd', { toggle: true });
+  assert.deepEqual([...choice.selected], ['b', 'd']);
+  choice = selectShelfItem(ids, choice.selected, choice.anchor, 'b', { range: true });
+  assert.deepEqual([...choice.selected], ['b', 'c', 'd']);
+  choice = selectShelfItem(ids, choice.selected, choice.anchor, 'c', { toggle: true });
+  assert.deepEqual([...choice.selected], ['b', 'd']);
+  choice = selectShelfItem(ids, choice.selected, choice.anchor, 'missing');
+  assert.deepEqual([...choice.selected], ['b', 'd']);
 });

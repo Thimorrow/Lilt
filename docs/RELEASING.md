@@ -1,30 +1,30 @@
-# Mac-Testversion veröffentlichen
+# Releasing a macOS beta
 
-Die erste Download-Version wird ausdrücklich als nicht notarisierte Beta veröffentlicht. Es ist aktuell kein gültiges Developer-ID-Zertifikat auf diesem Mac vorhanden. Ein Entwicklungszertifikat ersetzt keine Developer-ID-Signatur. Für einen späteren regulär notarisierten Download sind Apple-Developer-Zugang, Developer-ID-Signatur, passende Hardened-Runtime-Einstellungen und Notarisierung separat einzurichten.
+The download is an explicitly unnotarized beta. An Apple Development certificate is not a Developer ID certificate. A notarized release requires a Developer ID certificate, appropriate hardened runtime settings and Apple notarization to be set up separately.
 
-## Paket erzeugen
+## Build the package
 
-Auf einem Mac mit Xcode, aus einem sauberen, committeten Quellstand:
+On a Mac with Xcode, use a clean, committed source checkout:
 
 ```sh
-./scripts/package-release.sh 0.1.0-beta.1
+./scripts/package-release.sh 0.1.0-beta.2
 ```
 
-Das Skript exportiert ausschließlich den aktuellen Git-Commit in ein neues Build-Verzeichnis. Die laufende lokale Entwicklungs-App und ihre Signatur werden nicht ersetzt. Gebaut wird eine Universal-App für arm64/x86_64 ohne Android-Brücke und ohne Entwicklerzertifikat. Release-Bundle-ID: `io.github.thimorrow.Lilt`; lokale Entwicklungsbuilds behalten standardmäßig `local.lilt.preview`.
+The script exports the current Git commit to a separate build directory. It does not replace the running development app or its signature. It builds a universal arm64/x86_64 app without the Android bridge or a developer certificate. The release bundle ID is `io.github.thimorrow.Lilt`; local development builds default to `local.lilt.preview`.
 
-Ergebnis unter `build/releases/VERSION/`: DMG, ZIP, RELEASE-INFO.txt mit Quellcommit und SHA256SUMS.txt. Die Paketversion bezeichnet die Beta, die App-Version bleibt numerisch, zum Beispiel 0.1.0 mit Build 1. Vorhandene Pakete werden nicht überschrieben. Das Skript akzeptiert ausschließlich `MAJOR.MINOR.PATCH-beta.N`, damit ein nicht notarisiertes Paket nicht versehentlich als stabile Version entsteht.
+The output is `build/releases/VERSION/`, containing a DMG, ZIP, `RELEASE-INFO.txt` with the source commit and `SHA256SUMS.txt`. The beta suffix is part of the package version; the app version is numeric, for example 0.1.0 with build 2. Existing packages are not overwritten. The script accepts only `MAJOR.MINOR.PATCH-beta.N` so an unnotarized package cannot accidentally be labelled stable.
 
-## Vor Veröffentlichung prüfen
+## Verify before publishing
 
-- Swift-/Node-Tests und GitHub-CI des Quellcommits müssen bestehen.
-- `hdiutil verify` für das DMG; beide CPU-Architekturen mit `lipo` prüfen.
-- DMG schreibgeschützt einhängen, App in einen temporären Installationsordner kopieren und die Signatur sowie mitgelieferte Lizenzen prüfen. ZIP separat entpacken und die App vergleichen.
-- Tatsächlich entpackte App mit isolierten Diagnosedaten öffnen. Bestehende Nutzerinstanzen nicht beenden. Falls ihre Bundle-ID kollidiert, die Prüfung koordinieren; ein sofort beendeter Zweitprozess ist kein erfolgreicher Startnachweis.
-- Gatekeeper-Ablehnung der nicht notarisierten Beta ehrlich dokumentieren; niemals als notarisiert ausgeben oder systemweite Schutzmechanismen ausschalten.
-- Prüfsummen und Quellcommit mit dem Tag abgleichen. Keine Build-Caches, Nutzerdaten, Zugangsdaten oder Diagnoseaufnahmen hochladen.
+- Pass Swift and Node tests and GitHub CI for the source commit.
+- Verify the DMG with `hdiutil verify` and check both CPU architectures with `lipo`.
+- Mount the DMG read-only, copy the app to an isolated installation directory, and verify its signature and bundled licences. Unpack the ZIP separately and compare the app.
+- Launch the extracted app with isolated diagnostic data. Do not stop a user's existing instance; account for bundle-ID collisions. A second process that immediately exits is not proof of a successful launch.
+- Describe Gatekeeper's response honestly. Do not call the beta notarized or disable system-wide protections.
+- Check the checksums and source commit against the release tag. Do not upload build caches, user data, credentials or diagnostic captures.
 
-## GitHub
+## Publish on GitHub
 
-Den beauftragten Quellstand committen/pushen und CI abwarten. Dann einen neuen Tag `vVERSION` genau auf den im Paket angegebenen Commit setzen und die vier Dateien als GitHub-**Prerelease** veröffentlichen. Weder vorhandene Tags noch Release-Assets überschreiben. Der Release-Text nennt Installationsschritte, fehlende Notarisierung und konkrete Prüfgrenzen. Anschließend die öffentlichen Assets erneut herunterladen und gegen SHA256SUMS.txt prüfen.
+Commit and push the authorized source, and wait for CI. Create a new tag `vVERSION` at the exact source commit recorded in the package. Publish the four files as a GitHub **prerelease**; do not overwrite existing tags or assets. Include installation instructions, the lack of notarization and concrete testing limitations. Download the published files again and compare them against `SHA256SUMS.txt`.
 
-Installationshinweise: [INSTALL-BETA.txt](INSTALL-BETA.txt). Apple: [Apps auf dem Mac sicher öffnen](https://support.apple.com/en-us/102445), [Notarisierung](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
+See [INSTALL-BETA.txt](INSTALL-BETA.txt), [Apple's app-opening guidance](https://support.apple.com/en-us/102445) and [Apple's notarization documentation](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).

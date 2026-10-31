@@ -2,6 +2,7 @@ import AppKit
 import WebKit
 import ApplicationServices
 import Quartz
+import CoreFoundation
 
 final class NotchPanel: NSPanel {
     override var canBecomeKey: Bool { true }
@@ -9,13 +10,15 @@ final class NotchPanel: NSPanel {
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKNavigationDelegate, QLPreviewPanelDataSource, QLPreviewPanelDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKNavigationDelegate, QLPreviewPanelDataSource, QLPreviewPanelDelegate, NSSharingServicePickerDelegate {
     private var panel: NotchPanel!
     private var webView: NotchWebView!
     private var statusItem: NSStatusItem!
     private var pointerMonitor: Any?
     private var localPointerMonitor: Any?
     private var diagnosticTimer: Timer?
+    private var shelfTimer: Timer?
+    private var sharingPicker: NSSharingServicePicker?
     private var screenObserver: NSObjectProtocol?
     private var accessibilityObserver: NSObjectProtocol?
     private var wakeObserver: NSObjectProtocol?
@@ -77,11 +80,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         else if smokeTest || (diagnosticDirectory != nil && !CommandLine.arguments.contains("--live-brainfm")) { player = DisabledBrainFM() }
         else { player = brainFM }
         focus = FocusCoordinator(player: player, file: dataDirectory.appendingPathComponent("focus.json"), brainFMEnabled: settings.value.brainFMEnabled)
-        if focus.session.phase == .idle,
+        if focus.canApplyDefaults,
            focus.session.activity != settings.value.focusActivity || focus.session.duration != settings.value.focusMinutes * 60 {
             focus.configure(activity: settings.value.focusActivity, minutes: settings.value.focusMinutes)
         }
         shelf = ShelfStore(file: dataDirectory.appendingPathComponent("shelf.json"))
+        shelf.onChange = { [weak self] in self?.sendShelf() }
+        let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            let previous = self.shelf.entries.map(\.id)
+            self.shelf.pruneExpired()
+            if previous != self.shelf.entries.map(\.id) { self.sendShelf() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        shelfTimer = timer
         focus.onChange = { [weak self] in
             guard let self, self.ready else { return }
             self.send("receiveFocusSnapshot", value: self.focus.snapshot)
@@ -116,8 +128,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
                 if self.isOpen, !self.selectingFiles, !self.hitSurface(NSEvent.mouseLocation) { self.setOpen(false) }
             }
         }
-        localPointerMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .leftMouseDragged, .rightMouseDragged]) { [weak self] event in
+        localPointerMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .leftMouseDragged, .rightMouseDragged, .scrollWheel]) { [weak self] event in
             self?.updateMousePassthrough()
+            if event.type == .scrollWheel, let self, self.isOpen, !self.selectingFiles, event.window === self.panel {
+                self.webView.observeScrollWheel(event)
+            }
             if event.type == .leftMouseDown {
                 if event.window === self?.panel { self?.webView.recordMouseDown(event) }
                 else if self?.isOpen == true, self?.selectingFiles == false { self?.setOpen(false) }
@@ -233,6 +248,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         webView.setValue(false, forKey: "drawsBackground")
         webView.registerForDraggedTypes([.fileURL])
         webView.onFiles = { [weak self] urls in self?.addFiles(urls) }
+        webView.onTabSwipeProgress = { [weak self] phase, dx, dy, accepted, point in
+            guard let self, self.ready, self.isOpen, !self.selectingFiles,
+                  point.x.isFinite, point.y.isFinite, dx.isFinite, dy.isFinite else { return }
+            self.webView.sendTabSwipeProgress(phase, dx: dx, dy: dy, accepted: accepted, point: point)
+        }
         webView.onFileDragEntered = { [weak self] in
             self?.send("setDragging", value: true)
             self?.send("setView", value: "shelf")
@@ -257,8 +277,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         webView.load(URLRequest(url: URL(string: "lilt-ui://app/index.html")!))
     }
 
+    private func displayID(_ screen: NSScreen) -> String? {
+        guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber,
+              let uuid = CGDisplayCreateUUIDFromDisplayID(number.uint32Value)?.takeRetainedValue() else { return nil }
+        return CFUUIDCreateString(nil, uuid) as String
+    }
+
+    private func displayCandidates() -> [(NSScreen, DisplayCandidate)] {
+        NSScreen.screens.enumerated().map { index, screen in
+            (screen, DisplayCandidate(id: displayID(screen) ?? "unidentified-\(index)", name: screen.localizedName,
+                                      hasNotch: screen.safeAreaInsets.top > 0, isMain: screen == NSScreen.screens.first))
+        }
+    }
+
     private func currentGeometry() -> NotchGeometry {
-        let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }) ?? NSScreen.main ?? NSScreen.screens[0]
+        let candidates = displayCandidates()
+        let selected = DisplaySelection.resolve(candidates.map { $0.1 }, preferredID: settings.value.displayID)
+        let screen = candidates.first(where: { $0.1 == selected?.display })?.0 ?? NSScreen.main ?? NSScreen.screens[0]
         return NotchGeometry(screenFrame: screen.frame, safeTop: screen.safeAreaInsets.top,
                              leftArea: screen.auxiliaryTopLeftArea, rightArea: screen.auxiliaryTopRightArea)
     }
@@ -269,6 +304,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
             self.geometry = self.currentGeometry()
             self.panel.setFrame(self.geometry.panelFrame, display: true)
             self.configureUI()
+            self.sendSettings()
         }
         accessibilityObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             self?.configureUI()
@@ -290,6 +326,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         guard ready else { return }
         send("configure", value: ["hardwareWidth": geometry.hardwareWidth,
                                   "hardwareHeight": geometry.hardwareHeight,
+                                  "hideHardwareWings": geometry.hideHardwareWings,
+                                  "hideNotchContent": geometry.hideNotchContent,
                                   "reducedMotion": NSWorkspace.shared.accessibilityDisplayShouldReduceMotion])
         settingsWindow?.send("configure", value: ["reducedMotion": NSWorkspace.shared.accessibilityDisplayShouldReduceMotion])
     }
@@ -355,6 +393,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
 
     private var settingsSnapshot: [String: Any] {
         var snapshot = settings.value.payload
+        let candidates = displayCandidates().map { $0.1 }
+        snapshot["displays"] = candidates.filter { UUID(uuidString: $0.id) != nil }.map { ["id": $0.id, "name": $0.name] }
+        snapshot["displayUnavailable"] = DisplaySelection.resolve(candidates, preferredID: settings.value.displayID)?.preferredUnavailable ?? false
         snapshot["brainFMEnabled"] = focus.brainFMEnabled
         snapshot["musicBusy"] = music?.pending != nil
         snapshot["focusLocked"] = focus.integrationLocked
@@ -420,12 +461,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     private func updateSettings(_ changes: [String: Any]) {
         do {
             let value = try settings.value.applying(changes)
+            if value.displayID != settings.value.displayID, !value.displayID.isEmpty,
+               !displayCandidates().contains(where: { $0.1.id == value.displayID }) { throw SettingsError.invalid }
+            let displayChanged = value.displayID != settings.value.displayID
             let sourceChanged = value.musicSource != settings.value.musicSource
             let focusChanged = value.brainFMEnabled != focus.brainFMEnabled || value.focusMinutes != settings.value.focusMinutes || value.focusActivity != settings.value.focusActivity
             if sourceChanged, music.pending != nil { throw SettingsError.musicBusy }
             if focusChanged, focus.integrationLocked { throw SettingsError.focusBusy }
             guard settings.save(value) else { settingsError = settings.error; sendSettings(); return }
             settingsError = nil
+            if displayChanged {
+                geometry = currentGeometry()
+                panel.setFrame(geometry.panelFrame, display: true)
+                configureUI()
+            }
             if sourceChanged { _ = music.select(player: player(for: value.musicSource)) }
             if focusChanged {
                 _ = focus.setBrainFMEnabled(value.brainFMEnabled)
@@ -558,30 +607,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     }
 
     private func addFiles(_ urls: [URL]) {
-        shelf.add(urls)
+        shelf.add(urls, retentionDays: settings.value.shelfShortDays)
         sendShelf()
         send("setView", value: "shelf")
         setOpen(true)
     }
 
-    private func sendShelf() { if ready { send("receiveShelfSnapshot", value: shelf.snapshot) } }
+    private func sendShelf() {
+        shelf.pruneExpired()
+        if ready { send("receiveShelfSnapshot", value: shelf.snapshot) }
+    }
 
     private func shelfAction(_ body: [String: Any]) {
         guard let action = body["command"] as? String else { return }
         if action == "clear" { shelf.clear(); sendShelf(); return }
         if action == "refresh" { sendShelf(); return }
-        guard let id = body["id"] as? String, shelf.entries.contains(where: { $0.id == id }) else { return }
-        if action == "remove" { shelf.remove(id); sendShelf(); return }
-        if action == "menu" { showShelfMenu(id: id, body: body); return }
-        guard let url = shelf.resolvedURL(for: id) else {
+        shelf.pruneExpired()
+        let ids: [String]
+        if let values = body["ids"] as? [String], !values.isEmpty { ids = values }
+        else if let id = body["id"] as? String { ids = [id] }
+        else { return }
+        let known = Set(shelf.entries.map(\.id))
+        guard Set(ids).count == ids.count, ids.allSatisfy({ known.contains($0) }) else { return }
+        if action == "remove" { shelf.remove(ids); sendShelf(); return }
+        if action == "keep" { shelf.keepLonger(ids, retentionDays: settings.value.shelfLongDays); sendShelf(); return }
+        if action == "menu" { showShelfMenu(ids: ids, body: body); return }
+        let urls = ids.compactMap { shelf.resolvedURL(for: $0) }
+        guard urls.count == ids.count else {
             shelf.report("Die Datei ist nicht mehr verfügbar. Du kannst ihren Eintrag entfernen und die Datei erneut hinzufügen.")
             sendShelf(); return
         }
+        guard let url = urls.first else { return }
         switch action {
         case "open":
+            guard ids.count == 1 else { return }
             if !NSWorkspace.shared.open(url) { shelf.report("Die Datei konnte nicht geöffnet werden.") }
-        case "reveal": NSWorkspace.shared.activateFileViewerSelecting([url])
+        case "reveal":
+            guard ids.count == 1 else { return }
+            NSWorkspace.shared.activateFileViewerSelecting([url])
         case "preview":
+            guard ids.count == 1 else { return }
             previewURL = url
             if let preview = QLPreviewPanel.shared() {
                 preview.dataSource = self
@@ -592,20 +657,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         case "drag":
             let rect = CGRect(x: body["x"] as? Double ?? 0, y: body["y"] as? Double ?? 0,
                               width: body["width"] as? Double ?? 40, height: body["height"] as? Double ?? 40)
-            if !webView.dragFile(url, at: rect) { shelf.report("Ziehe die Datei erneut mit gedrückter Maustaste aus der Ablage.") }
+            if !webView.dragFiles(urls, at: rect) { shelf.report("Ziehe die Datei erneut mit gedrückter Maustaste aus der Ablage.") }
+        case "share":
+            let picker = NSSharingServicePicker(items: urls)
+            sharingPicker = picker
+            picker.delegate = self
+            let x = max(0, min(webView.bounds.width, body["x"] as? Double ?? webView.bounds.midX))
+            let y = max(0, min(webView.bounds.height, body["y"] as? Double ?? webView.bounds.midY))
+            let point = NSPoint(x: x, y: webView.isFlipped ? y : webView.bounds.height - y)
+            selectingFiles = true
+            picker.show(relativeTo: NSRect(origin: point, size: NSSize(width: 1, height: 1)), of: webView, preferredEdge: .minY)
         default: return
         }
         sendShelf()
     }
 
-    private func showShelfMenu(id: String, body: [String: Any]) {
+    private func showShelfMenu(ids: [String], body: [String: Any]) {
         let menu = NSMenu()
-        let available = shelf.resolvedURL(for: id) != nil
-        for (title, command) in [("Quick Look", "preview"), ("Open", "open"), ("Show in Finder", "reveal"), ("Remove from Shelf", "remove")] {
+        let available = ids.allSatisfy { shelf.resolvedURL(for: $0) != nil }
+        var actions = ids.count == 1 ? [("Quick Look", "preview"), ("Open", "open"), ("Show in Finder", "reveal")] : []
+        actions += [("Keep Longer", "keep"), ("Share…", "share"), ("Remove from Shelf", "remove")]
+        for (title, command) in actions {
             let item = NSMenuItem(title: title, action: #selector(shelfMenuAction(_:)), keyEquivalent: "")
             item.target = self
-            item.representedObject = ["id": id, "command": command]
-            item.isEnabled = available || command == "remove"
+            item.representedObject = ["ids": ids, "command": command, "x": body["x"] ?? 250, "y": body["y"] ?? 100] as [String : Any]
+            item.isEnabled = available || command == "remove" || command == "keep"
             menu.addItem(item)
         }
         menu.autoenablesItems = false
@@ -613,12 +689,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         let y = body["y"] as? Double ?? 100
         selectingFiles = true
         menu.popUp(positioning: nil, at: NSPoint(x: x, y: webView.isFlipped ? y : webView.bounds.height - y), in: webView)
-        selectingFiles = false
+        selectingFiles = sharingPicker != nil
     }
 
     @objc private func shelfMenuAction(_ item: NSMenuItem) {
         guard let command = item.representedObject as? [String: Any] else { return }
         shelfAction(command)
+    }
+
+    func sharingServicePicker(_ sharingServicePicker: NSSharingServicePicker, didChoose service: NSSharingService?) {
+        selectingFiles = false
+        sharingPicker = nil
     }
 
     func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int { previewURL == nil ? 0 : 1 }
@@ -713,6 +794,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         case "testPointer": diagnosticPointer(body)
         case "focusAction": receiveFocusAction(body)
         case "focusConfigure": receiveFocusConfiguration(body)
+        case "focusIntervalsConfigure":
+            guard let work = body["workMinutes"] as? NSNumber, let rest = body["restMinutes"] as? NSNumber,
+                  CFGetTypeID(work) != CFBooleanGetTypeID(), CFGetTypeID(rest) != CFBooleanGetTypeID(),
+                  work.doubleValue.isFinite, rest.doubleValue.isFinite,
+                  work.doubleValue.rounded() == work.doubleValue, rest.doubleValue.rounded() == rest.doubleValue,
+                  (1...180).contains(work.doubleValue), (1...180).contains(rest.doubleValue) else { return }
+            focus.configureIntervals(workMinutes: work.intValue, restMinutes: rest.intValue)
+        case "focusIntervalsNext": focus.nextInterval()
         case "shelfAction": shelfAction(body)
         case "testFocus": diagnosticFixture(body)
         case "quit": quit()
@@ -743,6 +832,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         if let pointerMonitor { NSEvent.removeMonitor(pointerMonitor) }
         if let localPointerMonitor { NSEvent.removeMonitor(localPointerMonitor) }
         diagnosticTimer?.invalidate()
+        shelfTimer?.invalidate()
         focus?.stop()
         music?.stop()
         if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }

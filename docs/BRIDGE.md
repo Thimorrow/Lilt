@@ -6,7 +6,7 @@ WKWebView serves only bundled Contents/Resources/Web at lilt-ui://app/index.html
 
 The settings window serves only `lilt-ui://app/settings.html` from the same bundled directory, in its own nonpersistent WKWebView. Main-frame messages are accepted only from the matching WebView. Both native WebViews enable keyboard tab focus on links and form controls. Settings opens through the Notch gear, menu, ⌘, or application reopen. Closing/folding the Notch does not close settings.
 
-`window.LiltSettings.receiveSnapshot` receives `{musicSource,sourceName,brainFMEnabled,focusMinutes,focusActivity,musicBusy,focusLocked,providers,brainFM,error,saved}`. Source is `spotify`, `appleMusic` or `meld`; minutes is an integer from 1–180. Provider entries have `{id,name,installed,running,availability,permission,message}`. `brainFM` has `installed` and `permission` booleans. `configure({reducedMotion})` disables all motion when requested; `inspect()` returns rendered state and runtime errors.
+`window.LiltSettings.receiveSnapshot` receives `{musicSource,sourceName,brainFMEnabled,focusMinutes,focusActivity,shelfShortDays,shelfLongDays,displayID,displays,displayUnavailable,musicBusy,focusLocked,providers,brainFM,error,saved}`. Source is `spotify`, `appleMusic` or `meld`; minutes is an integer from 1–180. The Shelf retention values are whole days from 1–3650. Provider entries have `{id,name,installed,running,availability,permission,message}`. `brainFM` has `installed` and `permission` booleans. `configure({reducedMotion})` disables all motion when requested; `inspect()` returns rendered state and runtime errors.
 
 Settings messages are `settingsReady`, `settingsUpdate {changes}`, `settingsClose`, `musicConnect`, `musicOpen`, `brainfmSettings` and `brainfm`. Only recognized settings fields and validated types cross the native boundary. Storage writes atomically to `settings.json` before runtime selection changes. A failed save keeps the last confirmed configuration. Music changes are refused while a transport command is pending. Focus defaults/integration changes are refused while a session is active or paused. Notch `focusConfigure` also updates saved defaults after an accepted native configuration.
 
@@ -29,9 +29,10 @@ Diagnostics may select `target: 'settings'`; `settingsSize: {width,height}` resi
 - `configure({hardwareWidth?,hardwareHeight?,reducedMotion?})` applies supplied geometry/accessibility values.
 - `setOpen(boolean)`, `setView('music'|'focus'|'shelf')`.
 - `setDragging(boolean)` displays the native file-drag target state.
+- `swipeGesture(phase,dx,dy,accepted,x,y,inputTime?)` receives precise native scroll phases (`begin`, `change`, `end`, `cancel`). Deltas retain macOS scroll direction; x/y are WebView coordinates and `inputTime` is the native monotonic event time in seconds. Pending calls are batched in order with one JavaScript evaluation in flight; no gesture phase or delta is discarded. The UI paints accumulated tracking once per display frame, including the tab marker, and settles from its current position and measured input velocity. Direct diagnostic calls may omit time. Vertical/horizontal-scroll exclusions, file drag, cancellation and reduced motion remain enforced. This API does not confirm a physical finger count or hardware performance.
 - `receiveMusicSnapshot({availability,id,title,artist,album,queueID,duration,elapsed,playing,buffering,speed,cover,canPlay,canPause,canNext,canPrevious,pending,error})` mirrors the native MusicCoordinator. Times are seconds. Availability is checking, ready, offline, empty, unavailable or disabled. Cover is a bounded JPEG data URI or null; pending is play, pause, next, previous or null; error is `{code,message}` or null.
 - `receiveFocusSnapshot({activity,duration,remaining,deadline,phase,owned,restoring,pending,error})` accepts the native FocusCoordinator snapshot. Activity is `deepWork` or `lightWork`; duration/remaining are seconds; deadline is Unix milliseconds or null. Phase is idle, running, paused, completed, uncertain or checking. Pending is `{id,action}` or null; error is `{code,message,action}` or null.
-- `receiveShelfSnapshot({items,limit,message})` replaces the visible shelf from native storage. Item is `{id,name,location,available,kind}`. Paths/bookmark data never enter the WebView. The ID identifies a native stored entry.
+- `receiveShelfSnapshot({items,message})` replaces the visible shelf from native storage. An item contains `{id,name,location,available,kind,expiresAt,retention,thumbnail?}`. The optional bounded image preview is a data URI; full paths and bookmark data never enter the WebView. The ID identifies a native stored entry.
 - `inspect()` returns the rendered UI/native mirror and JavaScript errors. It is read-only and does not drive the native timer.
 
 Native FocusCoordinator owns duration, activity, optional confirmed playback, wall-clock deadline, pending operation ID, storage and recovery. The UI has no independent focus timer, optimistic playback state or completion authority. Music only interpolates elapsed playback time between confirmed selected-player snapshots. It never selects a new track or declares playback on its own.
@@ -47,12 +48,15 @@ Every message uses `window.webkit.messageHandlers.lilt.postMessage`:
 - `musicAction {command:'play'|'pause'|'next'|'previous'}` requests an allowlisted targeted Meld operation; duplicate requests are suppressed until its result.
 - `meldOpen` explicitly opens the configured local Meld launcher and, after validating the AVD, its Android activity. It is never invoked by polling.
 - `focusAction {command:'start'|'pause'|'reset'|'finish'}`: serialized native operation. Start may select a requested activity. Other commands pause only the matching activity. Timer start/pause/completion requires confirmed results. Reset after a confirmed foreign activity only discards local ownership.
-- `shelfAction {command,id?,x?,y?,width?,height?}`: command is refresh, clear, preview, open, reveal, remove, menu or drag. Native actions validate an opaque stored ID and resolve its bookmark. Clear/remove never delete the original. Drag starts a native file-URL NSDraggingSession using a recent mouse event from Lilt's panel and advertises copy only. Menu coordinates are local UI points.
+- `shelfAction {command,id?,ids?,x?,y?,width?,height?}`: command is refresh, clear, preview, open, reveal, remove, keep, share, menu or drag. Native actions validate stored IDs and resolve bookmarks. Clear/remove never delete the original. Drag starts a native file-URL NSDraggingSession using a recent mouse event from Lilt's panel and advertises copy only. Sharing uses the macOS sharing picker. Menu coordinates are local UI points.
+- `focusIntervalsConfigure {workMinutes,restMinutes}` configures a sequence; `focusIntervalsNext` explicitly starts its next phase. Native Focus remains the timer authority, and a break does not start Brain.fm.
 - `brainfm`: explicitly open installed Brain.fm for user intervention.
 - `brainfmSettings`: user-invoked macOS permission prompt/settings. Never grants access automatically.
 - `quit`: terminate.
 
 Native NotchWebView accepts real incoming file URLs from NSDraggingInfo rather than reducing a drop to JavaScript file names. Outbound drags use native URL pasteboard items. Mouse-down capture is scoped to Lilt's own panel; no global input is synthesized for Shelf.
+
+Local precise, phased horizontal scroll events are observed without being consumed. The UI excludes closed Notch, file drag, focus menus and horizontally scrollable content while vertical scrolling remains available. The native event cannot prove the number of fingers; actual trackpad behavior requires a separate hardware check.
 
 ## Persistence and lifecycle
 
@@ -62,7 +66,7 @@ Focus writes configured state and confirmed transitions atomically. A native 250
 
 Lilt cannot act while fully terminated. A restored expired session must first prove a matching player before requesting Pause. The native timer continues while merely folded. Completion stays inside Lilt and does not open the panel or activate another app.
 
-Shelf stores stable IDs, bookmarks without implicit security grants and last resolved local URLs. URLs are normalized for duplicate comparison. Original files are not copied, moved or deleted by adding/removing references. All accepted entries remain scrollable/actionable. Limit is 24 with visible rejection feedback. Unavailable entries remain removable.
+Shelf stores stable IDs, bookmarks without implicit security grants, last resolved local URLs and fixed expiry dates. URLs are normalized for duplicate comparison. Original files are not copied, moved or deleted by adding/removing references or expiry. Entries remain scrollable/actionable beyond 24; unavailable entries remain removable. Legacy references without expiry are retained. Settings changes affect subsequently added or extended references only.
 
 ## Brain.fm control
 
