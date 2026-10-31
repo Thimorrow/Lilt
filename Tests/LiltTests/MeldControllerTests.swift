@@ -111,6 +111,68 @@ final class MeldControllerTests: XCTestCase {
         XCTAssertTrue(ready(elapsed: 0).confirms(.previous, before: before))
         XCTAssertFalse(ready(elapsed: 0).confirms(.previous, before: ready(elapsed: 0)))
     }
+
+    func testSourceSwitchDiscardsOldReadsAndClearsPreviousMetadata() {
+        let old = HeldMeld()
+        let replacement = HeldMeld()
+        let music = MusicCoordinator(player: old)
+        music.recheck()
+        let lateReply = old.reads.removeFirst()
+        XCTAssertTrue(music.select(player: replacement))
+        replacement.reads.removeFirst()(.success(ready(id: "new-source")))
+        lateReply(.success(ready(playing: true, id: "old-source")))
+        XCTAssertEqual(music.reading.id, "new-source")
+        XCTAssertFalse(music.reading.playing)
+        music.request(.play)
+        XCTAssertTrue(old.commands.isEmpty)
+        XCTAssertEqual(replacement.commands.count, 1)
+    }
+
+    func testSourceSwitchIsRefusedUntilPendingCommandFinishes() {
+        let old = HeldMeld()
+        let replacement = HeldMeld()
+        let music = MusicCoordinator(player: old)
+        music.recheck()
+        old.reads.removeFirst()(.success(ready()))
+        music.recheck()
+        music.request(.play)
+        XCTAssertFalse(music.select(player: replacement))
+        old.reads.removeFirst()(.success(ready()))
+        XCTAssertEqual(old.commands.count, 1)
+        XCTAssertTrue(replacement.reads.isEmpty)
+        old.commands.removeFirst().1(.success(ready(playing: true)))
+        XCTAssertTrue(music.select(player: replacement))
+        XCTAssertEqual(music.reading.availability, .checking)
+        XCTAssertTrue(music.reading.title.isEmpty)
+        XCTAssertFalse(music.reading.playing)
+    }
+
+    func testProviderSpecificOfflineErrorsRemainOffline() {
+        let player = HeldMeld()
+        let music = MusicCoordinator(player: player)
+        music.recheck()
+        player.reads.removeFirst()(.failure(MusicSource.spotify.error("offline")))
+        XCTAssertEqual(music.reading.availability, .offline)
+        XCTAssertTrue(music.error?.message.contains("Spotify") == true)
+    }
+
+    func testDisconnectedPlayerClearsOldMetadataArtworkAndCapabilities() {
+        let player = HeldMeld()
+        let music = MusicCoordinator(player: player)
+        music.recheck()
+        var connected = ready(playing: true)
+        connected.cover = "data:image/jpeg;base64,AA=="
+        player.reads.removeFirst()(.success(connected))
+        music.recheck()
+        player.reads.removeFirst()(.failure(MusicSource.appleMusic.error("offline")))
+        XCTAssertEqual(music.reading.availability, .offline)
+        XCTAssertTrue(music.reading.title.isEmpty)
+        XCTAssertTrue(music.reading.id.isEmpty)
+        XCTAssertNil(music.reading.cover)
+        XCTAssertFalse(music.reading.canPlay)
+        XCTAssertFalse(music.reading.canNext)
+        XCTAssertFalse(music.reading.playing)
+    }
 }
 
 private final class HeldMeld: MeldControlling {

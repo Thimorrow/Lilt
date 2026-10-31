@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freshFocus, focusSnapshot, focusLocked, focusPriority, focusAction } from '../Resources/Web/focus-state.mjs';
+import { freshFocus, focusSnapshot, focusLocked, focusAction } from '../Resources/Web/focus-state.mjs';
 const idle = () => ({ ...freshFocus(), ready: true, restoring: false, phase: 'idle' });
 test('UI waits for native state and rejects malformed activity, duration or phase', () => {
   assert.equal(focusLocked(freshFocus()), true);
@@ -16,10 +16,15 @@ test('native running, pending and uncertain states lock configuration', () => {
     assert.equal(focusLocked({ ...idle(), ...state }), true);
   }
 });
-test('active focus, failures and completion stay visible across other selected tabs', () => {
-  assert.equal(focusPriority(idle()), false);
-  for (const state of [{ owned: true, phase: 'paused' }, { phase: 'running', owned: true }, { pending: { action: 'start' } }, { error: { code: 'permission' } }, { phase: 'completed' }]) {
-    assert.equal(focusPriority({ ...idle(), ...state }), true);
+test('owned focus, failures and completion preserve their native state', () => {
+  for (const state of [{ owned: true, phase: 'paused' }, { phase: 'running', owned: true }, { pending: { id: '1', action: 'start' } }, { error: { code: 'permission', message: 'Allow access.', action: 'start' } }, { phase: 'completed', remaining: 0 }]) {
+    const native = { ...idle(), ...state };
+    const snapshot = focusSnapshot(native);
+    assert.equal(snapshot.phase, native.phase);
+    assert.equal(snapshot.owned, native.owned);
+    assert.equal(snapshot.remaining, native.remaining);
+    assert.deepEqual(snapshot.pending, native.pending);
+    assert.deepEqual(snapshot.error, native.error);
   }
 });
 test('UI requests native actions, including failed completion retry, without owning a clock', () => {

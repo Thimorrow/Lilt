@@ -2,6 +2,26 @@
 
 WKWebView serves only bundled Contents/Resources/Web at lilt-ui://app/index.html using WKURLSchemeHandler.
 
+## Settings and direct players
+
+The settings window serves only `lilt-ui://app/settings.html` from the same bundled directory, in its own nonpersistent WKWebView. Main-frame messages are accepted only from the matching WebView. Both native WebViews enable keyboard tab focus on links and form controls. Settings opens through the Notch gear, menu, ⌘, or application reopen. Closing/folding the Notch does not close settings.
+
+`window.LiltSettings.receiveSnapshot` receives `{musicSource,sourceName,brainFMEnabled,focusMinutes,focusActivity,musicBusy,focusLocked,providers,brainFM,error,saved}`. Source is `spotify`, `appleMusic` or `meld`; minutes is an integer from 1–180. Provider entries have `{id,name,installed,running,availability,permission,message}`. `brainFM` has `installed` and `permission` booleans. `configure({reducedMotion})` disables all motion when requested; `inspect()` returns rendered state and runtime errors.
+
+Settings messages are `settingsReady`, `settingsUpdate {changes}`, `settingsClose`, `musicConnect`, `musicOpen`, `brainfmSettings` and `brainfm`. Only recognized settings fields and validated types cross the native boundary. Storage writes atomically to `settings.json` before runtime selection changes. A failed save keeps the last confirmed configuration. Music changes are refused while a transport command is pending. Focus defaults/integration changes are refused while a session is active or paused. Notch `focusConfigure` also updates saved defaults after an accepted native configuration.
+
+The Notch receives `receiveSettingsSnapshot` and music snapshots additionally include `source` and `sourceName`. The selected tab is authoritative for both expanded and compact presentation. Running/paused/completed Focus does not override an explicitly selected Music or Shelf tab. Opening compact preserves the selected tab. Header, free inner surface, Escape and native outside clicks fold; interactive controls do not. There is no visible footer Fold button.
+
+`DirectMusicController` uses a source enum and the installed app's scripting definition to send Apple Events only to the already running Spotify/Music PID. Polling never opens an app or prompts for Automation permission. `musicConnect` explicitly requests that permission on a background queue. `musicOpen` explicitly opens the selected app without a Play command. There is no OAuth, copied login, token, global media key or arbitrary app target. Commands compare fresh before/after observations and fail if playback or track change is unconfirmed. Source selection invalidates old reads and clears metadata; disconnected states clear stale artwork and controls.
+
+Apple Music artwork is read natively; Spotify artwork is fetched only over HTTPS from `i.scdn.co`, without cookies/credentials/redirects and with bounded size/time. Both become at most 160px bounded JPEG data URIs before reaching the WebView. The Android bridge is optional at build/runtime for direct providers.
+
+New installations default to Spotify with Brain.fm disabled. In independent mode, native Focus start/pause/resume/reset/finish never call the Brain.fm controller. A running deadline continues across restart; expired sessions remain completed. The persisted session records its integration mode. Legacy or mismatched active modes pause conservatively with an explicit message and do not read or modify music. When Brain.fm is enabled, the existing confirmed-playback lifecycle below applies.
+
+Diagnostics may select `target: 'settings'`; `settingsSize: {width,height}` resizes only that window within bounded test dimensions. Diagnostic responses include actual settings frame/visibility/key state. `scripts/native-command.mjs DIRECTORY SCRIPT [EVIDENCE] [settings] [WIDTHxHEIGHT]` drives the existing isolated seam. With independent Focus, `testFocus` in diagnostic mode accepts only bounded `remaining` to check expiry; it cannot enable real playback. Normal app mode ignores that fixture.
+
+`testPointer {phase:'down'|'up',x,y}` is accepted only in diagnostic mode from the Notch's main frame. Finite coordinates must lie within its WebView bounds. Native NSEvents are delivered exclusively to Lilt's own panel, including WebKit's real pointer/focus default actions. They do not move the global mouse or address another application. Normal app mode ignores this fixture. Dropdown regression tests use down/up pairs rather than DOM-only `click()` so transient WebKit focus loss is exercised.
+
 ## Native → UI
 
 `window.Lilt` exposes:
@@ -14,7 +34,7 @@ WKWebView serves only bundled Contents/Resources/Web at lilt-ui://app/index.html
 - `receiveShelfSnapshot({items,limit,message})` replaces the visible shelf from native storage. Item is `{id,name,location,available,kind}`. Paths/bookmark data never enter the WebView. The ID identifies a native stored entry.
 - `inspect()` returns the rendered UI/native mirror and JavaScript errors. It is read-only and does not drive the native timer.
 
-Native FocusCoordinator owns duration, activity, confirmed playback, wall-clock deadline, pending operation ID, storage and recovery. The UI has no independent focus timer, optimistic playback state or completion authority. Music only interpolates elapsed playback time between confirmed Meld snapshots. It never selects a new track or declares playback on its own.
+Native FocusCoordinator owns duration, activity, optional confirmed playback, wall-clock deadline, pending operation ID, storage and recovery. The UI has no independent focus timer, optimistic playback state or completion authority. Music only interpolates elapsed playback time between confirmed selected-player snapshots. It never selects a new track or declares playback on its own.
 
 ## UI → native
 
@@ -38,7 +58,7 @@ Native NotchWebView accepts real incoming file URLs from NSDraggingInfo rather t
 
 Normal storage is `~/Library/Application Support/Lilt`. `--data-dir DIR` replaces it for isolated normal UI/connection/restart tests. Diagnostic runs otherwise use `--ui-test-dir DIR` → `DIR/data`; smoke storage is temporary.
 
-Focus writes configured state and confirmed transitions atomically. A native 250 ms timer checks deadlines and publishes changing remaining seconds. Read-only Brain.fm polling runs approximately every three seconds while Lilt owns a session, with wake rechecking. Unknown playback freezes the last confirmed remaining time and shows an error. After restart, checking is shown until a real matching observation. No music starts automatically. If a stored running session is now paused, the unknown off-app pause time is not invented: the last verified remaining time is preserved. A pending failed finish remains finish intent across restart.
+Focus writes configured state and confirmed transitions atomically. A native 250 ms timer checks deadlines and publishes changing remaining seconds. When Brain.fm is enabled, read-only polling runs approximately every three seconds while Lilt owns a session, with wake rechecking. Unknown playback freezes the last confirmed remaining time and shows an error. After restart, checking is shown until a real matching observation. No music starts automatically. If a stored running session is now paused, the unknown off-app pause time is not invented: the last verified remaining time is preserved. A pending failed finish remains finish intent across restart.
 
 Lilt cannot act while fully terminated. A restored expired session must first prove a matching player before requesting Pause. The native timer continues while merely folded. Completion stays inside Lilt and does not open the panel or activate another app.
 
@@ -56,7 +76,7 @@ The only target is ADB serial `emulator-5580` on local socket `tcp:localhost:504
 
 `scripts/build-meld-bridge.sh` compiles the small `Resources/Android/MeldBridge.java` source against Android 34 and packages DEX into `Contents/Resources/MeldBridge.jar`. The runtime pushes that trusted helper into the isolated emulator's `/data/local/tmp` on connection. `app_process` initializes the Android 14 media framework and uses MediaSessionManager without root, application changes or security-policy changes. No account data or private Meld files are read. Metadata and at most a 160px JPEG thumbnail enter the WebView; no remote artwork URL is loaded.
 
-MeldController runs on a serial background queue with bounded process time/output and explicit arguments. MusicCoordinator reads approximately every two seconds, including while folded. An in-flight read cannot overwrite a later user request. Command results must prove the requested state or track change; an exit code alone is insufficient. Polling never starts the emulator, activity or music. Unknown/closed/empty sessions clear apparent playback. Open Meld is an explicit return path, including when the emulator is running but the Android activity was closed. Music is not persisted by Lilt; restarting rereads Meld without a Play command. Existing Focus priority remains above active Music.
+MeldController runs on a serial background queue with bounded process time/output and explicit arguments. MusicCoordinator reads approximately every two seconds, including while folded. An in-flight read cannot overwrite a later user request. Command results must prove the requested state or track change; an exit code alone is insufficient. Polling never starts the emulator, activity or music. Unknown/closed/empty sessions clear apparent playback. Open Meld is an explicit return path, including when the emulator is running but the Android activity was closed. Music is not persisted by Lilt; restarting rereads Meld without a Play command. Compact presentation follows the explicitly selected view.
 
 ## Window and diagnostics
 

@@ -107,11 +107,14 @@ await frame();
 check('restoring normal motion does not replay a transition', settled('shelf') && motion().length === 0);
 Lilt.setOpen(false);
 await wait(600);
-Lilt.setView('music');
-check('switching compact views does not animate invisible contents', settled('music') && motion().length === 0);
-Lilt.setOpen(true);
-await wait(650);
-check('reopening shows the selected panel correctly', settled('music') && Lilt.inspect().open);
+for (const view of views) {
+  Lilt.setView(view);
+  check(`${view} selected while compact does not animate invisible contents`, settled(view) && motion().length === 0);
+  document.querySelector('.notch-compact').click(); await wait(650);
+  check(`${view} reopens exactly the selected panel`, settled(view) && Lilt.inspect().view === view && Lilt.inspect().open);
+  Lilt.setOpen(false); await wait(600);
+}
+Lilt.setView('music'); Lilt.setOpen(true); await wait(650);
 const final = Lilt.inspect();
 check('tab motion preserves music, focus and shelf state', JSON.stringify({ ...final.music, since: 0 }) === JSON.stringify({ ...baseline.music, since: 0 }) && JSON.stringify(final.focus) === JSON.stringify(baseline.focus) && JSON.stringify(final.shelf) === JSON.stringify(baseline.shelf));
 check('tab switching sends no focus playback request', final.focus.pending === null && final.focus.deadline === baseline.focus.deadline);

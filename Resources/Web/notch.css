@@ -80,10 +80,10 @@ svg { display: block; }
 .tabs button{position:relative;display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 14px;border:0;border-radius:999px;background:transparent;font-size:13px;font-weight:600;letter-spacing:0.01em;color:var(--notch-ink);mix-blend-mode:difference;opacity:.7;cursor:pointer}
 .tabs button svg{width:16px;height:16px}
 .tabs button[aria-selected=true]{opacity:1}
-.tabs button:focus-visible,.notch .icon-btn:focus-visible,.notch .text-btn:focus-visible,.notch .drop:focus-visible,.fold:focus-visible{outline-color:var(--notch-ink)}
-.fold{display:flex;align-items:center;gap:6px;min-height:44px;padding:0 12px;border:0;border-radius:999px;background:transparent;color:color-mix(in srgb,var(--notch-ink) 70%,transparent);font-size:13px;font-weight:600;cursor:pointer}
-.fold svg{width:16px;height:16px;transform:rotate(180deg)}
-.fold:hover{color:var(--notch-ink);background:color-mix(in srgb,var(--notch-ink) 8%,transparent)}
+.tabs button:focus-visible,.notch .icon-btn:focus-visible,.notch .text-btn:focus-visible,.notch .drop:focus-visible,.settings-button:focus-visible{outline-color:var(--notch-ink)}
+.settings-button{display:grid;place-items:center;width:44px;min-height:44px;padding:0;border:0;border-radius:999px;background:transparent;color:color-mix(in srgb,var(--notch-ink) 70%,transparent);cursor:pointer;transition:background-color 140ms linear,color 140ms linear}
+.settings-button svg{width:17px;height:17px}
+.settings-button:hover{color:var(--notch-ink);background:color-mix(in srgb,var(--notch-ink) 8%,transparent)}
 .wave{display:flex;align-items:center;gap:3px;height:18px}
 .wave i{width:3px;height:100%;border-radius:2px;background:var(--accent-1, #ff7a45);transform:scaleY(0.28);transform-origin:center}
 .music-playing .wave i{animation:wave 900ms ease-in-out infinite alternate}
@@ -132,6 +132,7 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
 .focus-trigger:disabled .focus-chevron{visibility:hidden}
 .focus-trigger:focus-visible{outline-offset:4px}
 .focus-menu{position:absolute;z-index:2;width:164px;padding:4px;border:1px solid color-mix(in srgb,var(--notch-ink) 14%,transparent);border-radius:12px;background:#1c1919;box-shadow:0 8px 20px rgb(0 0 0 / .4);color:var(--notch-ink)}
+.focus-menu[inert]{pointer-events:none}
 .focus-menu button{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:28px;width:100%;padding:4px 8px;border:0;border-radius:7px;background:none;color:inherit;text-align:left;font:inherit;font-size:13px;font-weight:500;line-height:1.2;white-space:nowrap;cursor:pointer}
 .focus-menu button:hover{background:color-mix(in srgb,var(--notch-ink) 9%,transparent)}
 .focus-menu button:focus-visible{outline:2px solid var(--notch-ink);outline-offset:-2px}

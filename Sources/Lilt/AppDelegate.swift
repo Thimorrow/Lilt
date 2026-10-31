@@ -23,6 +23,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     private var focus: FocusCoordinator!
     private var shelf: ShelfStore!
     private var music: MusicCoordinator!
+    private var settings: SettingsStore!
+    private var settingsWindow: SettingsWindowController?
+    private var settingsError: SettingsError?
+    private let spotify = DirectMusicController(source: .spotify)
+    private let appleMusic = DirectMusicController(source: .appleMusic)
     private let meld = MeldController()
     private let simulatedMusic = SimulatedMeld()
     private var previewURL: URL?
@@ -58,25 +63,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     private var simulated: Bool { diagnosticDirectory != nil && CommandLine.arguments.contains("--simulate-brainfm") }
 
     private func makeStores() {
+        let settingsFile = dataDirectory.appendingPathComponent("settings.json")
+        let hasSettings = FileManager.default.fileExists(atPath: settingsFile.path)
+        settings = SettingsStore(file: settingsFile, focusFile: dataDirectory.appendingPathComponent("focus.json"))
+        if !hasSettings, simulated || simulatedMeld {
+            var initial = settings.value
+            if simulatedMeld { initial.musicSource = .meld }
+            if simulated { initial.brainFMEnabled = true }
+            settings.save(initial)
+        }
         let player: BrainFMControlling
         if simulated { player = simulatedPlayer }
         else if smokeTest || (diagnosticDirectory != nil && !CommandLine.arguments.contains("--live-brainfm")) { player = DisabledBrainFM() }
         else { player = brainFM }
-        focus = FocusCoordinator(player: player, file: dataDirectory.appendingPathComponent("focus.json"))
+        focus = FocusCoordinator(player: player, file: dataDirectory.appendingPathComponent("focus.json"), brainFMEnabled: settings.value.brainFMEnabled)
+        if focus.session.phase == .idle,
+           focus.session.activity != settings.value.focusActivity || focus.session.duration != settings.value.focusMinutes * 60 {
+            focus.configure(activity: settings.value.focusActivity, minutes: settings.value.focusMinutes)
+        }
         shelf = ShelfStore(file: dataDirectory.appendingPathComponent("shelf.json"))
         focus.onChange = { [weak self] in
             guard let self, self.ready else { return }
             self.send("receiveFocusSnapshot", value: self.focus.snapshot)
+            self.sendSettings()
         }
         focus.startObserving()
-        let musicPlayer: MeldControlling
-        if simulatedMeld { musicPlayer = simulatedMusic }
-        else if smokeTest || (diagnosticDirectory != nil && !CommandLine.arguments.contains("--live-meld")) { musicPlayer = DisabledMeld() }
-        else { musicPlayer = meld }
-        music = MusicCoordinator(player: musicPlayer)
+        music = MusicCoordinator(player: self.player(for: settings.value.musicSource))
         music.onChange = { [weak self] in
             guard let self, self.ready else { return }
-            self.send("receiveMusicSnapshot", value: self.music.snapshot)
+            self.sendMusic()
+            self.sendSettings()
         }
         music.startObserving()
     }
@@ -93,15 +109,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         makePanel()
         observeScreen()
         installWakeObservers()
-        pointerMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged]) { [weak self] _ in
-            self?.updateMousePassthrough()
+        pointerMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .rightMouseDown, .leftMouseDragged, .rightMouseDragged]) { [weak self] event in
+            guard let self else { return }
+            self.updateMousePassthrough()
+            if event.type == .leftMouseDown || event.type == .rightMouseDown {
+                if self.isOpen, !self.selectingFiles, !self.hitSurface(NSEvent.mouseLocation) { self.setOpen(false) }
+            }
         }
         localPointerMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .leftMouseDragged, .rightMouseDragged]) { [weak self] event in
             self?.updateMousePassthrough()
-            if event.type == .leftMouseDown, event.window === self?.panel { self?.webView.recordMouseDown(event) }
+            if event.type == .leftMouseDown {
+                if event.window === self?.panel { self?.webView.recordMouseDown(event) }
+                else if self?.isOpen == true, self?.selectingFiles == false { self?.setOpen(false) }
+            }
             return event
         }
         updateMousePassthrough()
+        if CommandLine.arguments.contains("--settings") { showSettings() }
         if let directory = diagnosticDirectory {
             try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             if let data = try? Data(contentsOf: directory.appendingPathComponent("command.json")),
@@ -129,13 +153,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
             menu.addItem(item)
         }
         menu.addItem(.separator())
-        addItem("Meld öffnen", action: #selector(openMeld), to: menu)
-        addItem("Brain.fm öffnen", action: #selector(openBrainFM), to: menu)
-        addItem("Brain.fm-Steuerung erlauben…", action: #selector(openAccessibilitySettings), to: menu)
+        addItem("Einstellungen…", action: #selector(showSettings), key: ",", to: menu)
+        addItem("Musikplayer öffnen", action: #selector(openMusic), to: menu)
         addItem("Über Lilt", action: #selector(showAbout), to: menu)
         menu.addItem(.separator())
         addItem("Lilt beenden", action: #selector(quit), key: "q", to: menu)
         statusItem.menu = menu
+        let mainMenu = NSMenu()
+        let applicationItem = NSMenuItem()
+        let applicationMenu = NSMenu()
+        addItem("Einstellungen…", action: #selector(showSettings), key: ",", to: applicationMenu)
+        applicationMenu.addItem(.separator())
+        addItem("Lilt beenden", action: #selector(quit), key: "q", to: applicationMenu)
+        applicationItem.submenu = applicationMenu
+        mainMenu.addItem(applicationItem)
+        let editItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
+        let editMenu = NSMenu(title: "Edit")
+        for (title, selector, key) in [("Cut", "cut:", "x"), ("Copy", "copy:", "c"), ("Paste", "paste:", "v"), ("Select all", "selectAll:", "a")] {
+            editMenu.addItem(NSMenuItem(title: title, action: Selector(selector), keyEquivalent: key))
+        }
+        editItem.submenu = editMenu
+        mainMenu.addItem(editItem)
+        let windowItem = NSMenuItem(title: "Window", action: nil, keyEquivalent: "")
+        let windowMenu = NSMenu(title: "Window")
+        windowMenu.addItem(NSMenuItem(title: "Close window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w"))
+        windowItem.submenu = windowMenu
+        mainMenu.addItem(windowItem)
+        NSApp.mainMenu = mainMenu
     }
 
     private func addItem(_ title: String, action: Selector, key: String = "", to menu: NSMenu) {
@@ -184,6 +228,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         config.userContentController = controller
         config.websiteDataStore = .nonPersistent()
         config.preferences.javaScriptCanOpenWindowsAutomatically = false
+        config.preferences.tabFocusesLinks = true
         webView = NotchWebView(frame: CGRect(origin: .zero, size: NotchGeometry.panelSize), configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
         webView.registerForDraggedTypes([.fileURL])
@@ -246,6 +291,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         send("configure", value: ["hardwareWidth": geometry.hardwareWidth,
                                   "hardwareHeight": geometry.hardwareHeight,
                                   "reducedMotion": NSWorkspace.shared.accessibilityDisplayShouldReduceMotion])
+        settingsWindow?.send("configure", value: ["reducedMotion": NSWorkspace.shared.accessibilityDisplayShouldReduceMotion])
     }
 
     private func send(_ method: String, value: Any) {
@@ -265,7 +311,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     @objc private func togglePanel() { setOpen(!isOpen) }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        setOpen(true)
+        showSettings()
         return false
     }
 
@@ -278,6 +324,147 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         guard let view = item.representedObject as? String else { return }
         send("setView", value: view)
         setOpen(true)
+    }
+
+    private func player(for source: MusicSource) -> MeldControlling {
+        if source == .meld, simulatedMeld { return simulatedMusic }
+        let liveFlag = source == .meld ? "--live-meld" : "--live-music"
+        if smokeTest || (diagnosticDirectory != nil && !CommandLine.arguments.contains(liveFlag)) { return DisabledMeld() }
+        switch source {
+        case .spotify: return spotify
+        case .appleMusic: return appleMusic
+        case .meld: return meld
+        }
+    }
+
+    private var directPlayer: DirectMusicController? {
+        switch settings.value.musicSource {
+        case .spotify: return spotify
+        case .appleMusic: return appleMusic
+        case .meld: return nil
+        }
+    }
+
+    private func sendMusic() {
+        guard ready, music != nil else { return }
+        var snapshot = music.snapshot
+        snapshot["source"] = settings.value.musicSource.rawValue
+        snapshot["sourceName"] = settings.value.musicSource.title
+        send("receiveMusicSnapshot", value: snapshot)
+    }
+
+    private var settingsSnapshot: [String: Any] {
+        var snapshot = settings.value.payload
+        snapshot["brainFMEnabled"] = focus.brainFMEnabled
+        snapshot["musicBusy"] = music?.pending != nil
+        snapshot["focusLocked"] = focus.integrationLocked
+        snapshot["brainFM"] = ["installed": brainFM.applicationURL != nil, "permission": brainFM.hasPermission]
+        snapshot["error"] = (settingsError ?? settings.error).map(\.payload) as Any? ?? NSNull()
+        snapshot["saved"] = settingsError == nil && settings.error == nil
+        snapshot["providers"] = MusicSource.allCases.map { source -> [String: Any] in
+            let controller: DirectMusicController? = source == .spotify ? spotify : source == .appleMusic ? appleMusic : nil
+            let selected = source == settings.value.musicSource
+            let fixture = source == .meld && simulatedMeld
+            let installed = fixture || (source == .meld ? meld.applicationURL != nil : controller?.applicationURL != nil)
+            let running = fixture ? music?.reading.availability == .ready || music?.reading.availability == .empty : controller?.isRunning ?? !NSRunningApplication.runningApplications(withBundleIdentifier: source.bundleIdentifier).isEmpty
+            let status = controller?.permissionStatus
+            let needsPermission = selected && ["permission", "permissionRequired"].contains(music?.error?.code ?? "")
+            let message: String
+            if !installed { message = "Install \(source.title) to use it with Lilt." }
+            else if !running { message = "Open \(source.title) to connect." }
+            else if status == -1743 { message = "Allow Lilt in System Settings → Privacy & Security → Automation." }
+            else if status == -1744 { message = "Allow Lilt to connect to \(source.title)." }
+            else { message = selected ? music?.error?.message ?? "" : "Select \(source.title) to connect." }
+            return ["id": source.rawValue, "name": source.title, "installed": installed, "running": running,
+                    "availability": needsPermission ? "permission" : selected ? music?.reading.availability.rawValue ?? "checking" : installed ? "offline" : "unavailable",
+                    "permission": status == 0, "message": message]
+        }
+        return snapshot
+    }
+
+    private func sendSettings() {
+        guard settings != nil, focus != nil else { return }
+        if ready { send("receiveSettingsSnapshot", value: settingsSnapshot) }
+        settingsWindow?.send("receiveSnapshot", value: settingsSnapshot)
+    }
+
+    @objc private func showSettings() {
+        if settingsWindow == nil {
+            let resources = Bundle.main.resourceURL!.appendingPathComponent("Web", isDirectory: true)
+            let controller = SettingsWindowController(resources: resources)
+            controller.onReady = { [weak self] in
+                guard let self else { return }
+                self.settingsWindow?.send("configure", value: ["reducedMotion": NSWorkspace.shared.accessibilityDisplayShouldReduceMotion])
+                self.sendSettings()
+            }
+            controller.onAction = { [weak self] body in self?.handleSettingsAction(body) }
+            settingsWindow = controller
+        }
+        if isOpen { setOpen(false) }
+        settingsWindow?.present()
+    }
+
+    private func handleSettingsAction(_ body: [String: Any]) {
+        switch body["action"] as? String {
+        case "settingsUpdate":
+            guard let changes = body["changes"] as? [String: Any] else { return }
+            updateSettings(changes)
+        case "musicConnect": connectMusic()
+        case "musicOpen": openMusic()
+        case "brainfmSettings": openAccessibilitySettings()
+        case "brainfm": openBrainFM()
+        default: break
+        }
+    }
+
+    private func updateSettings(_ changes: [String: Any]) {
+        do {
+            let value = try settings.value.applying(changes)
+            let sourceChanged = value.musicSource != settings.value.musicSource
+            let focusChanged = value.brainFMEnabled != focus.brainFMEnabled || value.focusMinutes != settings.value.focusMinutes || value.focusActivity != settings.value.focusActivity
+            if sourceChanged, music.pending != nil { throw SettingsError.musicBusy }
+            if focusChanged, focus.integrationLocked { throw SettingsError.focusBusy }
+            guard settings.save(value) else { settingsError = settings.error; sendSettings(); return }
+            settingsError = nil
+            if sourceChanged { _ = music.select(player: player(for: value.musicSource)) }
+            if focusChanged {
+                _ = focus.setBrainFMEnabled(value.brainFMEnabled)
+                focus.configure(activity: value.focusActivity, minutes: value.focusMinutes)
+            }
+            sendMusic()
+            sendSettings()
+        } catch let error as SettingsError { settingsError = error; sendSettings() }
+        catch { settingsError = .invalid; sendSettings() }
+    }
+
+    private func connectMusic() {
+        guard !smokeTest, diagnosticDirectory == nil || CommandLine.arguments.contains("--live-music") else {
+            music.recheck(); sendSettings(); return
+        }
+        guard let controller = directPlayer else { music.recheck(); return }
+        controller.connect { [weak self] result in
+            guard let self, controller === self.directPlayer else { return }
+            if case .failure(let error) = result { self.music.report(error) }
+            else { self.music.recheck() }
+            self.sendSettings()
+        }
+    }
+
+    @objc private func openMusic() {
+        if settings.value.musicSource == .meld { openMeld(); return }
+        guard !smokeTest, diagnosticDirectory == nil || CommandLine.arguments.contains("--live-music"),
+              let controller = directPlayer else { return }
+        guard let url = controller.applicationURL else {
+            music.report(.init(code: "notInstalled", message: "Install \(settings.value.musicSource.title) to connect it to Lilt.")); return
+        }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { [weak self] _, error in
+            DispatchQueue.main.async {
+                guard let self, controller === self.directPlayer else { return }
+                if error != nil { self.music.report(.init(code: "openFailed", message: "The selected music player could not be opened. Open it from Applications and try again.")) }
+                else { self.music.recheck() }
+                self.sendSettings()
+            }
+        }
     }
 
     @objc private func openMeld() {
@@ -297,7 +484,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     }
 
     @objc private func openBrainFM() {
-        guard !smokeTest, diagnosticDirectory == nil else { return }
+        guard settings.value.brainFMEnabled, !smokeTest, diagnosticDirectory == nil else { return }
         guard let url = brainFM.applicationURL else {
             let alert = NSAlert()
             alert.messageText = "Die Brain.fm-App wurde nicht gefunden."
@@ -317,7 +504,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     }
 
     @objc private func openAccessibilitySettings() {
-        guard !smokeTest, diagnosticDirectory == nil else { return }
+        guard settings.value.brainFMEnabled, !smokeTest, diagnosticDirectory == nil else { return }
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
@@ -334,12 +521,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         guard let raw = body["activity"] as? String, let activity = FocusActivity(rawValue: raw),
               let minutes = body["minutes"] as? Int, (1...180).contains(minutes) else { return }
         focus.configure(activity: activity, minutes: minutes)
+        if focus.session.activity == activity, focus.session.duration == minutes * 60 {
+            var value = settings.value
+            value.focusActivity = activity
+            value.focusMinutes = minutes
+            settings.save(value)
+            sendSettings()
+        }
     }
 
     @objc private func showAbout() {
         let alert = NSAlert()
         alert.messageText = "Lilt"
-        alert.informativeText = "Lokaler Nachbau des Lilt-Konzepts von Vayun Godara.\n\nMusic zeigt und steuert Meld in der lokalen Android-Umgebung. Focus steuert Deep Work oder Light Work in der installierten Brain.fm-App. Shelf speichert lokale Dateiverweise, ohne Originale zu verschieben oder hochzuladen.\n\nReferenz: vayun.net/studies/lilt/"
+        alert.informativeText = "Lokale Mac-App nach dem Lilt-Konzept von Vayun Godara.\n\nMusic verbindet Spotify, Apple Music oder die lokale Meld-App. Focus funktioniert unabhängig, mit optionaler Brain.fm-Verbindung. Shelf speichert lokale Dateiverweise.\n\nReferenz: vayun.net/studies/lilt/"
         alert.addButton(withTitle: "Schließen")
         alert.runModal()
     }
@@ -443,6 +637,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     }
 
     private func diagnosticFixture(_ body: [String: Any]) {
+        if diagnosticDirectory != nil, !focus.brainFMEnabled {
+            if let seconds = body["remaining"] as? Int { focus.setDiagnosticRemaining(seconds) }
+            return
+        }
         guard simulated else { return }
         if let raw = body["activity"] as? String, let activity = FocusActivity(rawValue: raw) { simulatedPlayer.activity = activity }
         if let raw = body["playback"] as? String, let playback = BrainFMController.PlaybackState(rawValue: raw) { simulatedPlayer.playback = playback }
@@ -485,7 +683,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
             configureUI()
             send("receiveFocusSnapshot", value: focus.snapshot)
             sendShelf()
-            send("receiveMusicSnapshot", value: music.snapshot)
+            sendSettings()
+            sendMusic()
             panel.orderFrontRegardless()
             if smokeTest { DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { self.runSmokeTest() } }
         case "openChanged":
@@ -502,12 +701,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
                 updateMousePassthrough()
             }
         case "chooseFiles": chooseFiles()
+        case "settingsOpen": showSettings()
+        case "musicOpen": openMusic()
+        case "musicConnect": connectMusic()
         case "brainfm": openBrainFM()
         case "brainfmSettings": openAccessibilitySettings()
         case "musicAction":
             if let raw = body["command"] as? String, let command = MeldCommand(rawValue: raw) { music.request(command) }
         case "meldOpen": openMeld()
         case "testMusic": diagnosticMusicFixture(body)
+        case "testPointer": diagnosticPointer(body)
         case "focusAction": receiveFocusAction(body)
         case "focusConfigure": receiveFocusConfiguration(body)
         case "shelfAction": shelfAction(body)
@@ -523,6 +726,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
             return
         }
         decisionHandler(.allow)
+    }
+
+    private func diagnosticPointer(_ body: [String: Any]) {
+        guard diagnosticDirectory != nil,
+              let x = body["x"] as? Double, let y = body["y"] as? Double,
+              x.isFinite, y.isFinite, x >= 0, x < webView.bounds.width, y >= 0, y < webView.bounds.height,
+              let phase = body["phase"] as? String, ["down", "up"].contains(phase) else { return }
+        let type: NSEvent.EventType = phase == "down" ? .leftMouseDown : .leftMouseUp
+        let point = NSPoint(x: x, y: panel.contentView!.bounds.height - y)
+        guard let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: panel.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: phase == "down" ? 1 : 0) else { return }
+        panel.sendEvent(event)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -543,12 +757,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
               let id = command["id"] as? String, id != lastDiagnosticID,
               let script = command["script"] as? String else { return }
         lastDiagnosticID = id
-        webView.callAsyncJavaScript(script, arguments: [:], in: nil, in: .page) { [weak self] result in
+        let settingsTarget = command["target"] as? String == "settings"
+        if settingsTarget, settingsWindow == nil { showSettings() }
+        if settingsTarget, let size = command["settingsSize"] as? [String: Double],
+           let width = size["width"], let height = size["height"],
+           width.isFinite, height.isFinite, (700...1600).contains(width), (540...1200).contains(height) {
+            settingsWindow?.window?.setContentSize(NSSize(width: width, height: height))
+        }
+        guard let targetWebView = settingsTarget ? settingsWindow?.webView : webView else { return }
+        targetWebView.callAsyncJavaScript(script, arguments: [:], in: nil, in: .page) { [weak self] result in
             guard let self else { return }
             var response: [String: Any] = ["id": id, "panelFrame": NSStringFromRect(self.panel.frame), "surfaceRect": NSStringFromRect(self.surfaceRect), "ignoresMouseEvents": self.panel.ignoresMouseEvents,
                 "brainfmPermission": self.brainFM.hasPermission,
                 "brainfmScan": self.brainFM.lastScanSummary,
                 "dataDirectory": self.dataDirectory.path, "simulatedBrainFM": self.simulated, "simulatedMeld": self.simulatedMeld,
+                "settingsFrame": self.settingsWindow?.window.map { NSStringFromRect($0.frame) } as Any? ?? NSNull(),
+                "settingsVisible": self.settingsWindow?.window?.isVisible ?? false,
+                "settingsKey": self.settingsWindow?.window?.isKeyWindow ?? false,
+                "keyWindow": NSApp.keyWindow?.title as Any? ?? NSNull(),
                 "nativeChecks": [
                     ["name": "panel touches physical screen top", "pass": abs(self.panel.frame.maxY - self.geometry.screenFrame.maxY) < 0.1],
                     ["name": "panel covers menu bar icons", "pass": self.panel.level.rawValue > NSWindow.Level.statusBar.rawValue]
@@ -563,7 +789,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
                 }
             }
             if command["snapshot"] as? Bool == true {
-                self.snapshot(to: directory.appendingPathComponent("capture.png")) { error in
+                self.snapshot(to: directory.appendingPathComponent("capture.png"), webView: targetWebView) { error in
                     response["snapshotSuccess"] = error == nil
                     if let error { response["snapshotError"] = error.localizedDescription }
                     finish(response)
@@ -572,8 +798,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         }
     }
 
-    private func snapshot(to url: URL, completion: ((Error?) -> Void)? = nil) {
-        webView.takeSnapshot(with: nil) { image, error in
+    private func snapshot(to url: URL, webView target: WKWebView? = nil, completion: ((Error?) -> Void)? = nil) {
+        (target ?? webView).takeSnapshot(with: nil) { image, error in
             if let error { completion?(error); return }
             guard let image, let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff),
                   let data = bitmap.representation(using: .png, properties: [:]) else {

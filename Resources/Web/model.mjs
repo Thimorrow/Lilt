@@ -31,5 +31,4 @@ export const elapsedAt = (music, now) => {
   const value = music.elapsed + (music.playing ? Math.max(0, now - music.since) / 1000 * music.speed : 0);
   return music.duration > 0 ? Math.min(music.duration, value) : value;
 };
-export const musicPriority = music => music.availability === 'ready' && (music.playing || music.buffering || music.pending !== null);
 export const musicAction = music => music.playing ? 'pause' : 'play';

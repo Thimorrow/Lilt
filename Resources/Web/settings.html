@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Lilt settings</title>
+  <link rel="stylesheet" href="settings.css">
+  <script type="module" src="settings.js"></script>
+</head>
+<body>
+<svg class="symbols" width="0" height="0" aria-hidden="true" focusable="false"><defs>
+  <symbol id="s-wordmark" viewBox="0 0 152 100"><g fill="none" stroke="currentColor" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"><path d="M11 12V86M45 54V86M79 12V86M113 24V68Q113 86 131 86M101 48H137"/></g><path d="M30 2H60V18A8 8 0 0 1 52 26H38A8 8 0 0 1 30 18Z" fill="currentColor"/></symbol>
+  <symbol id="s-music" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></g></symbol>
+  <symbol id="s-focus" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.6 1.6M9.5 3h5"/></g></symbol>
+  <symbol id="s-check" viewBox="0 0 24 24"><path d="m6 12 4 4 8-8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="s-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="s-spotify" viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="currentColor"/><g fill="none" stroke="var(--logo-cutout, #131313)" stroke-linecap="round"><path d="M8.5 12.1c5.5-1.6 10.8-1.1 15.4 1.5" stroke-width="2.2"/><path d="M9.6 16.2c4.5-1.3 8.8-.8 12.8 1.2" stroke-width="1.9"/><path d="M10.7 20.1c3.7-.9 6.9-.6 10.1 1" stroke-width="1.6"/></g></symbol>
+  <symbol id="s-appleMusic" viewBox="0 0 32 32"><path d="M24.4 4.7v17c0 2.2-1.5 3.7-3.8 4.1-2.2.4-4-.6-4-2.3 0-1.6 1.2-2.8 3.3-3.2l2-.4V11l-11.3 2.4v11c0 2.2-1.6 3.8-3.9 4.1-2.2.4-4-.6-4-2.3 0-1.6 1.3-2.8 3.4-3.2l2-.4V9.3c0-.7.4-1.2 1.1-1.3l13.7-2.9c.8-.2 1.5-.1 1.5-.4Z" fill="currentColor" transform="translate(2 -1)"/></symbol>
+  <symbol id="s-meld" viewBox="0 0 32 32"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 23V10a2 2 0 0 1 3.5-1.3L16 17l7.5-8.3A2 2 0 0 1 27 10v13"/><path d="m10 23 6-6 6 6"/></g></symbol>
+  <symbol id="s-brain" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V5a3 3 0 0 0-5.7-1.3 3.5 3.5 0 0 0-3 5.5A4 4 0 0 0 5 16.8 3.5 3.5 0 0 0 12 20Zm0 0V5a3 3 0 0 1 5.7-1.3 3.5 3.5 0 0 1 3 5.5 4 4 0 0 1-1.7 7.6A3.5 3.5 0 0 1 12 20Z"/><path d="M7 8c3 0 3 4 0 4m10-4c-3 0-3 4 0 4M7 17h1m8 0h1"/></g></symbol>
+  <symbol id="s-error" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 7.5v5m0 3.5v.1" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+</defs></svg>
+<div class="settings-shell">
+  <aside class="sidebar">
+    <div class="brand" aria-label="Lilt"><svg aria-hidden="true"><use href="#s-wordmark"/></svg></div>
+    <nav class="settings-nav" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+      <span class="nav-selection" aria-hidden="true"></span>
+      <button id="settings-tab-music" type="button" role="tab" aria-controls="settings-music" aria-selected="true" data-section="music"><svg aria-hidden="true"><use href="#s-music"/></svg><span>Music</span></button>
+      <button id="settings-tab-focus" type="button" role="tab" aria-controls="settings-focus" aria-selected="false" tabindex="-1" data-section="focus"><svg aria-hidden="true"><use href="#s-focus"/></svg><span>Focus</span></button>
+    </nav>
+    <div class="sidebar-bottom"><span>Settings</span><span class="save-state" role="status" aria-live="polite"><svg aria-hidden="true"><use href="#s-check"/></svg><span data-save-state>Loading…</span></span></div>
+  </aside>
+  <main class="settings-main">
+    <div class="section-stack">
+      <section id="settings-music" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-music" data-active="true">
+        <h1>Music</h1>
+        <fieldset class="player-fieldset">
+          <legend>Player</legend>
+          <div class="player-picker" role="radiogroup" aria-label="Music player">
+            <span class="player-selection" aria-hidden="true"></span>
+            <button type="button" class="player-option" role="radio" aria-checked="true" data-source="spotify" disabled><svg class="player-logo" aria-hidden="true"><use href="#s-spotify"/></svg><span>Spotify</span><svg class="option-check" aria-hidden="true"><use href="#s-check"/></svg></button>
+            <button type="button" class="player-option" role="radio" aria-checked="false" tabindex="-1" data-source="appleMusic" disabled><svg class="player-logo" aria-hidden="true"><use href="#s-appleMusic"/></svg><span>Apple Music</span><svg class="option-check" aria-hidden="true"><use href="#s-check"/></svg></button>
+            <button type="button" class="player-option" role="radio" aria-checked="false" tabindex="-1" data-source="meld" disabled><svg class="player-logo" aria-hidden="true"><use href="#s-meld"/></svg><span>Meld</span><svg class="option-check" aria-hidden="true"><use href="#s-check"/></svg></button>
+          </div>
+        </fieldset>
+        <div class="connection-card">
+          <div class="connection-heading"><span class="connection-icon"><svg aria-hidden="true"><use href="#s-spotify" data-provider-icon/></svg></span><div><h2 data-provider-name>Spotify</h2><span class="connection-status" data-status="checking"><i aria-hidden="true"></i><span data-provider-status>Checking connection…</span></span></div></div>
+          <p class="connection-message" data-provider-message hidden></p>
+          <div class="connection-actions"><button class="button primary" type="button" data-action="music-connect" disabled>Connect<svg aria-hidden="true"><use href="#s-arrow"/></svg></button><button class="button secondary" type="button" data-action="music-open" disabled>Open Spotify<svg aria-hidden="true"><use href="#s-arrow"/></svg></button></div>
+        </div>
+        <p class="context-note" data-music-busy hidden>Wait for the current player command to finish.</p>
+      </section>
+      <section id="settings-focus" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-focus" data-active="false" aria-hidden="true" inert>
+        <h1>Focus</h1>
+        <form id="duration-form" class="duration-block" novalidate>
+          <label for="default-minutes">Default duration</label>
+          <div class="duration-editor"><input id="default-minutes" type="number" inputmode="numeric" min="1" max="180" step="1" value="25" aria-describedby="duration-error" autocomplete="off" disabled><span>min</span><button class="duration-apply" type="submit" aria-label="Save default duration" hidden><svg aria-hidden="true"><use href="#s-check"/></svg></button></div>
+          <div class="duration-presets" aria-label="Default duration presets"><button type="button" data-minutes="25" aria-pressed="true" disabled>25 min</button><button type="button" data-minutes="50" aria-pressed="false" disabled>50 min</button><button type="button" data-minutes="90" aria-pressed="false" disabled>90 min</button></div>
+          <p id="duration-error" class="field-error" role="alert" hidden></p>
+        </form>
+        <div class="focus-options">
+          <div class="activity-row"><span id="activity-label">Activity</span><div class="activity-picker" role="radiogroup" aria-labelledby="activity-label"><span class="activity-selection" aria-hidden="true"></span><button type="button" role="radio" aria-checked="true" data-activity="deepWork" disabled>Deep Work</button><button type="button" role="radio" aria-checked="false" tabindex="-1" data-activity="lightWork" disabled>Light Work</button></div></div>
+          <div class="integration-row"><div class="integration-label"><span class="integration-icon"><svg aria-hidden="true"><use href="#s-brain"/></svg></span><div><label id="brainfm-label" for="brainfm-toggle">Brain.fm</label><span class="integration-caption" data-brainfm-caption>Optional focus music</span></div></div><button id="brainfm-toggle" class="switch" type="button" role="switch" aria-checked="false" aria-labelledby="brainfm-label" disabled><span></span></button></div>
+          <div class="integration-detail" data-brainfm-detail hidden><p data-brainfm-message></p><button class="button secondary" type="button" data-action="brainfm-permission" hidden>Allow control<svg aria-hidden="true"><use href="#s-arrow"/></svg></button><button class="button secondary" type="button" data-action="brainfm-open" hidden>Open Brain.fm<svg aria-hidden="true"><use href="#s-arrow"/></svg></button></div>
+        </div>
+        <p class="context-note" data-focus-locked hidden>Reset or finish your focus session to change these settings.</p>
+      </section>
+    </div>
+    <div class="settings-error" role="alert" hidden><svg aria-hidden="true"><use href="#s-error"/></svg><span data-error-message></span></div>
+  </main>
+</div>
+<p class="sr" role="status" aria-live="polite" data-announce></p>
+</body>
+</html>

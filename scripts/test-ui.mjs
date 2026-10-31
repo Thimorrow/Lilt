@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freshMusic, elapsedAt, musicSnapshot, musicPriority, musicAction, clock } from '../Resources/Web/model.mjs';
+import { freshMusic, elapsedAt, musicSnapshot, musicAction, clock } from '../Resources/Web/model.mjs';
 
 const ready = extra => ({ ...freshMusic(), availability: 'ready', id: 'track', title: 'A song', duration: 120, elapsed: 15, canPlay: true, canPause: true, ...extra });
 
@@ -31,13 +31,14 @@ test('malformed snapshots and remote artwork are rejected safely', () => {
   assert.equal(musicSnapshot(ready({ cover: 'data:image/jpeg;base64,aGVsbG8=' }), 0).cover, 'data:image/jpeg;base64,aGVsbG8=');
 });
 
-test('offline and buffering never animate playback or expose transport controls', () => {
+test('offline disables transport and buffering never advances playback time', () => {
   const offline = musicSnapshot(ready({ availability: 'offline', playing: true }), 0);
   assert.equal(offline.playing, false);
   assert.equal(offline.canPlay, false);
-  assert.equal(musicPriority(offline), false);
+  assert.equal(offline.canPause, false);
+  assert.equal(elapsedAt(offline, 90000), 15);
   const buffering = musicSnapshot(ready({ buffering: true, playing: true }), 0);
   assert.equal(buffering.playing, false);
-  assert.equal(musicPriority(buffering), true);
-  assert.equal(musicPriority(musicSnapshot(ready({ pending: 'play' }), 0)), true);
+  assert.equal(elapsedAt(buffering, 90000), 15);
+  assert.equal(musicSnapshot(ready({ pending: 'play' }), 0).pending, 'play');
 });

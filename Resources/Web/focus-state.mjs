@@ -8,5 +8,4 @@ export function focusSnapshot(value) {
   return { ...value, ready: true };
 }
 export const focusLocked = focus => !focus.ready || Boolean(focus.pending) || focus.phase === 'running' || focus.phase === 'uncertain' || focus.restoring;
-export const focusPriority = focus => Boolean(focus.pending || focus.error || focus.owned || focus.phase === 'completed');
 export const focusAction = focus => focus.error?.action || (focus.phase === 'running' ? 'pause' : 'start');

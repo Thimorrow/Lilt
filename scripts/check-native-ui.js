@@ -39,13 +39,19 @@ check('running focus locks duration and activity', document.querySelector('#focu
 for (const view of ['music', 'shelf']) {
   Lilt.setView(view); await wait(300);
   Lilt.setOpen(false); await wait(550);
-  check(`${view} cannot hide compact active focus`, document.querySelector('[data-compact="right"]').textContent.includes(':') && document.querySelector('[data-compact="left"] .dot'));
+  check(`${view} stays selected in compact mode while Focus runs`, Lilt.inspect().view === view && Lilt.inspect().focus.phase === 'running' && !document.querySelector('[data-compact="left"] .dot') && (view === 'music' ? Boolean(document.querySelector('[data-compact="left"] .mini-cover')) : Boolean(document.querySelector('[data-compact="left"] .glyph'))));
   click('.notch-compact'); await wait(550);
-  check(`${view} compact opens focus`, Lilt.inspect().view === 'focus' && Lilt.inspect().open);
+  check(`${view} reopens the selected view without interrupting Focus`, Lilt.inspect().view === view && Lilt.inspect().open && Lilt.inspect().focus.phase === 'running');
 }
+Lilt.setView('focus', { animate: false });
 click('[data-action="focus"]'); await until(() => Lilt.inspect().focus.phase === 'paused');
 const left = Lilt.inspect().remaining; await wait(1100);
 check('paused native timer stays fixed', Lilt.inspect().remaining === left);
+Lilt.setView('music', { animate: false }); Lilt.setOpen(false); await wait(550);
+check('paused Focus does not replace selected compact Music', Lilt.inspect().view === 'music' && Lilt.inspect().focus.phase === 'paused' && Boolean(document.querySelector('[data-compact="left"] .mini-cover')) && !document.querySelector('[data-compact="left"] .dot'));
+click('.notch-compact'); await wait(550);
+check('Music reopens while paused Focus retains its remaining time', Lilt.inspect().open && Lilt.inspect().view === 'music' && Lilt.inspect().remaining === left);
+Lilt.setView('focus', { animate: false });
 post({ action: 'testFocus', playback: 'playing', activity: 'lightWork', poll: true });
 await until(() => Lilt.inspect().focus.phase === 'running');
 check('external simulated resume is reflected without a user start', Lilt.inspect().focus.phase === 'running');
@@ -66,11 +72,14 @@ for (const [code, message] of [['permission', 'Erlaube Lilt unter Systemeinstell
 }
 post({ action: 'testFocus', clearError: true });
 click('[data-action="focus"]'); await until(() => Lilt.inspect().focus.phase === 'running');
-Lilt.setOpen(false); await wait(550);
+Lilt.setView('music', { animate: false }); Lilt.setOpen(false); await wait(550);
 post({ action: 'testFocus', remaining: 1 });
 await until(() => Lilt.inspect().focus.phase === 'completed');
-check('native completion pauses and stays folded', Lilt.inspect().remaining === 0 && Lilt.inspect().focus.phase === 'completed' && !Lilt.inspect().open && document.querySelector('[data-compact="right"]').textContent === 'Done');
+check('native completion stays folded without replacing selected Music', Lilt.inspect().remaining === 0 && Lilt.inspect().focus.phase === 'completed' && !Lilt.inspect().open && Lilt.inspect().view === 'music' && Boolean(document.querySelector('[data-compact="left"] .mini-cover')) && !document.querySelector('[data-compact="left"] .dot'));
 click('.notch-compact'); await wait(550);
+check('completed Focus does not redirect Music when reopening', Lilt.inspect().open && Lilt.inspect().view === 'music' && Lilt.inspect().focus.phase === 'completed');
+Lilt.setView('focus', { animate: false });
+check('Focus still shows its completed timer when explicitly selected', document.querySelector('[data-live="focus"]').textContent === '0:00' && Lilt.inspect().focus.phase === 'completed');
 click('[data-action="focus-reset"]'); await wait(150);
 Lilt.setView('shelf'); await wait(300);
 Lilt.receiveShelfSnapshot({ items: Array.from({ length: 8 }, (_, index) => ({ id: `ui-fixture-${index}`, name: index === 0 ? '<script>alert(1)</script>' : `file-${index}.txt`, location: `folder-${index}`, available: index !== 1 })), message: null });
@@ -80,7 +89,12 @@ check('missing shelf item stays visible and removable', document.querySelectorAl
 click('[data-action="clear"]'); await wait(100);
 check('native clear restores empty shelf', !document.querySelector('.drop').hidden && Lilt.inspect().shelf.length === 0);
 Lilt.setView('music');
-click('[data-action="fold"]'); await wait(90); Lilt.setOpen(true); await wait(650);
+check('footer has settings and no Fold button', document.querySelector('.settings-button') && !document.querySelector('.notch-foot [data-action="fold"]') && !document.querySelector('.notch-foot').textContent.includes('Fold'));
+click('#tab-music');
+check('interactive controls do not fold the notch', Lilt.inspect().open);
+click('.notch-foot');
+check('free notch space folds on click', !Lilt.inspect().open);
+await wait(90); Lilt.setOpen(true); await wait(650);
 check('interrupted fold settles open', Lilt.inspect().open && getComputedStyle(document.querySelector('.notch-panel')).opacity === '1');
 notch.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(600);
 check('escape folds', !Lilt.inspect().open);

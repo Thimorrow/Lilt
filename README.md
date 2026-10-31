@@ -4,15 +4,13 @@ Lokale Mac-App nach der [Lilt-Studie von Vayun Godara](https://vayun.net/studies
 
 ## Produktrichtung
 
-Lilt soll eine eigenständig einstellbare Mac-App für Musik, Fokus und Dateien werden. Priorität haben direkte, einfach einzurichtende Anbindungen an Spotify und Apple Music. Musikanbieter und weitere Lilt-Einstellungen sollen innerhalb der App konfigurierbar sein. Focus soll auch ohne Brain.fm funktionieren; eine Brain.fm-Anbindung ist optional.
-
-Dieser Ausgangsstand enthält noch die bisherige Meld-Musiksteuerung und den an Brain.fm gekoppelten Fokus-Timer. Direkte Spotify-/Apple-Music-Anbindungen, ein unabhängiger Fokus-Timer und eine zentrale Einstellungsansicht sind **noch nicht umgesetzt**. Die Anforderungen stehen in [SPEC.md](SPEC.md).
+Lilt verbindet Spotify und Apple Music direkt und bietet zusätzlich die lokale Meld-Anbindung. Focus funktioniert unabhängig; Brain.fm ist optional. Musikquelle, Fokusvorgaben und optionale Verbindungen werden im eigenen Einstellungsfenster gewählt und lokal gespeichert. Anforderungen stehen in [SPEC.md](SPEC.md), der tatsächliche Prüfstand und offene Live-Nachweise in [STATUS.md](STATUS.md).
 
 Das GitHub-Repository ist zunächst privat. Der Nutzer hat die Open-Source-Veröffentlichung freigegeben; die Projektlizenz und Hinweise zu übernommenen Assets sind vor der öffentlichen Freigabe noch festzulegen. Herkunft: [docs/REFERENCE.md](docs/REFERENCE.md).
 
 ## Voraussetzungen
 
-Benötigt macOS 15+ und Xcode/Swift zum Bauen. Für die Meld-Anbindung werden die hier vorhandenen Android-SDK-Plattform 34, Build Tools 36.0.0 und das JDK aus Android Studio verwendet. `ANDROID_SDK_ROOT` und `JAVA_HOME` können die Buildpfade ersetzen.
+Benötigt macOS 15+ und Xcode/Swift zum Bauen. Spotify, Apple Music, Focus und Shelf benötigen kein Android. Die optionale Meld-Brücke wird gebaut, wenn Android-SDK-Plattform 34, Build Tools 36.0.0 und das JDK vorhanden sind. `ANDROID_SDK_ROOT` und `JAVA_HOME` ersetzen die Buildpfade; `LILT_BUILD_MELD=0` lässt die Brücke ausdrücklich weg, `LILT_BUILD_MELD=1` verlangt sie.
 
 ## Starten
 
@@ -21,7 +19,16 @@ Benötigt macOS 15+ und Xcode/Swift zum Bauen. Für die Meld-Anbindung werden di
 open build/Lilt.app
 ```
 
-Auf die kompakte Notch klicken. Der obere Bereich, Fold und Escape klappen sie wieder ein. Music, Focus und Shelf wechseln die Ansichten. Beenden über das Menüleistensymbol.
+Auf die kompakte Notch klicken. Der obere Bereich, freie Innenflächen, Außenklicks und Escape klappen sie wieder ein. Buttons und andere Bedienelemente bleiben bedienbar; ein eigener Fold-Knopf entfällt. Music, Focus und Shelf wechseln die Ansichten. Das Zahnrad, das Menüleistensymbol oder ⌘, öffnen die Einstellungen. Beenden über das Menüleistensymbol.
+
+## Einstellungen und direkte Musikverbindungen
+
+- Unter Music Spotify, Apple Music oder Meld wählen. Die Auswahl wird gespeichert. Ein laufender Playerbefehl sperrt den Quellenwechsel; Antworten einer alten Quelle werden verworfen.
+- Spotify beziehungsweise Apple Music als normale Mac-App installieren und öffnen. **Connect** erlaubt nach ausdrücklicher Entscheidung die macOS-Automation. Bloße Zustandsprüfung und Quellenwahl fragen keine Berechtigung an und starten weder Apps noch Musik.
+- Titel, Interpret, Album, Cover, Dauer, Fortschritt und Wiedergabezustand kommen vom gewählten Player. Play/Pause und Vor/Zurück werden am tatsächlichen Ergebnis bestätigt. Ohne gewählten Titel zuerst im Player ein Lied auswählen.
+- Spotify und Apple Music benötigen keine Meld-Umgebung, Web-Anmeldung in Lilt, API-Schlüssel oder Kontotokens. Lilt steuert ausschließlich den gewählten App-Prozess, keine globalen Medientasten. Cover gelangen als begrenzte JPEG-Daten in die Oberfläche; Spotify-Cover werden ausschließlich von dessen Bildserver geladen.
+- Unter Focus Standarddauer und Aktivität einstellen. Die optionale Brain.fm-Verbindung ist auf neuen Installationen ausgeschaltet. Änderungen während einer laufenden oder pausierten Sitzung sind gesperrt, bis sie beendet oder zurückgesetzt wurde.
+- Einstellungen verwenden die vorhandene Schrift und dunkle Gestaltung. Auswahl und Navigation bewegen sich kurz und unterbrechbar; Tastatureingaben und reduzierte Bewegung wechseln unmittelbar. Das Fenster bleibt unabhängig von der Notch geöffnet.
 
 ## Music und Meld
 
@@ -29,12 +36,16 @@ Music liest den tatsächlichen Player der separat eingerichteten Meld-Android-Um
 
 - Meld muss über `~/Applications/Meld.app` eingerichtet sein. Der zugehörige Emulator heißt `Meld` und verwendet Anschluss 5580; der lokale ADB-Server verwendet 5040. Andere Android-Geräte und Mac-Musikplayer werden nicht gesteuert.
 - Die Zustandsprüfung öffnet Meld nicht und startet keine Musik. Bei geschlossenem Emulator oder fehlendem Titel bietet Music **Open Meld**. Wähle den ersten Titel in Meld selbst.
-- Aktive Musik erscheint auch bei einem zuletzt gewählten anderen Tab in der kompakten Notch. Eine aktive oder fehlgeschlagene Fokus-Sitzung behält Vorrang.
+- Die kompakte Notch zeigt die zuletzt gewählte Ansicht. Music bleibt beim Falten ausgewählt, auch wenn ein Fokus-Timer läuft oder abgeschlossen ist.
 - Angefragte Befehle sperren weitere Transportklicks bis zum bestätigten Ergebnis. Fehler werden angezeigt; ein erfolgreicher Befehlsaufruf allein wird nicht als laufende Wiedergabe dargestellt.
 - Die Verbindung benötigt keine zusätzlichen macOS-Bedienungshilfen, keinen Spotify-/Google-Tokenzugriff und keinen Root-Zugriff in Android. Sie verändert Meld nicht. Ein kleiner gebündelter Java-Helfer läuft über das vorhandene Android-Diagnosewerkzeug und liest nur die Meld-Mediensitzung.
 - Lilt speichert keine Meld-Anmeldung oder Wiedergabehistorie. Meld verwaltet seine eigenen Daten in der separaten Android-Umgebung. Lilt beendet oder pausiert Meld beim eigenen Beenden nicht automatisch.
 
-## Focus und Brain.fm
+## Focus und optionale Brain.fm-Verbindung
+
+Ohne Brain.fm funktioniert Focus als nativer Timer mit Start, Pause, Fortsetzen, Reset und Abschluss. Der Timer läuft auch bei eingeklappter Notch. Laufende unabhängige Sitzungen behalten nach Neustart ihre Deadline; inzwischen abgelaufene Sitzungen werden als abgeschlossen angezeigt. Ausgeschaltetes Brain.fm wird weder gelesen noch gesteuert und benötigt keine Bedienungshilfen-Freigabe.
+
+Die folgenden Regeln gelten bei ausdrücklich eingeschalteter Brain.fm-Verbindung:
 
 - Den großen Timer anklicken, um 25, 50 oder eine eigene Dauer von 1–180 Minuten zu wählen. Den dezenten Aktivitätsnamen anklicken, um Deep Work oder Light Work einzustellen. Escape schließt erst die Auswahl und danach die Notch.
 - Start wählt die gewünschte Aktivität in der installierten Brain.fm-App und startet oder setzt sie fort. Der Timer läuft erst nach bestätigter Wiedergabe.
@@ -42,12 +53,12 @@ Music liest den tatsächlichen Player der separat eingerichteten Meld-Android-Um
 - Pause, Reset und Timerende prüfen die tatsächlich ausgewählte Aktivität, bevor sie Musik pausieren. Andere Aktivitäten werden nur durch einen ausdrücklichen neuen Start gewechselt.
 - Änderungen direkt im Brain.fm-Player werden etwa alle drei Sekunden gelesen, solange eine von Lilt verwaltete Sitzung besteht. Nicht eindeutig erkennbare Zustände werden als Fehler angezeigt.
 - Nach App-Neustart wird eine gespeicherte Sitzung erst gegen Brain.fm geprüft. Es startet keine Musik automatisch. Bei unbekanntem externem Pausezeitpunkt bleibt die letzte bestätigte Restzeit erhalten.
-- Laufende, pausierte und fehlgeschlagene Fokus-Sitzungen haben in der kompakten Notch Vorrang vor dem zuletzt angesehenen Tab. Nach Abschluss steht dort Done. Der Klick öffnet Focus.
+- Bei ausgewähltem Focus zeigt die kompakte Notch die Restzeit und nach Abschluss Done. Andere gewählte Tabs bleiben beim Falten und Öffnen erhalten.
 - Der native Timer funktioniert auch bei eingeklappter Notch. Ist Lilt vollständig beendet, kann es Brain.fm nicht am Timerende pausieren. Eine überfällige Sitzung wird beim nächsten Start geprüft und dann gegebenenfalls beendet.
 
 Brain.fm muss installiert und angemeldet sein. „Run in Separate Window“ und „Infinite“ wurden auf diesem Mac mit Nutzerfreigabe eingestellt, damit der Player im Hintergrund erreichbar bleibt und Lilt die Zeit übernimmt.
 
-Lilt benötigt die macOS-Freigabe unter Datenschutz & Sicherheit → Bedienungshilfen, ab macOS 27 „Device Control and Data Access“. Open Settings in Lilt fordert sie für die aktuelle App an. Die App liest nur die benötigten Bedienelemente von Brain.fm. Eingaben werden ausschließlich an dessen überprüften Prozess geschickt. Die START-Navigation verwendet die angebotene Bedienungshilfen-Aktion des eindeutig erkannten Elements. Keine globalen Medien- oder Tastatureingaben, synthetischen Mausklicks, Browser, Kontotokens oder kopierten Anmeldedaten.
+Für Brain.fm benötigt Lilt die macOS-Freigabe unter Datenschutz & Sicherheit → Bedienungshilfen. **Allow control** in den Einstellungen fordert sie ausdrücklich an. Die App liest nur die benötigten Bedienelemente von Brain.fm. Eingaben werden ausschließlich an dessen überprüften Prozess geschickt. Die START-Navigation verwendet die angebotene Bedienungshilfen-Aktion des eindeutig erkannten Elements. Keine globalen Medien- oder Tastatureingaben, synthetischen Mausklicks, Browser, Kontotokens oder kopierten Anmeldedaten.
 
 Eine offene Aktivitätsauswahl oder die Home-Ansicht mit Miniplayer bestätigt keine Pause. Bei unklarer Ansicht meldet Lilt einen Fehler und bietet Open Brain.fm. Wechselt der Nutzer zu einer anderen Aktivität, verwirft Reset nach bestätigtem Aktivitätsverlust nur die lokale Sitzung.
 
@@ -61,13 +72,13 @@ Lokale Dateien hineinziehen oder auswählen. Lilt speichert Dateiverweise einsch
 - Bis zu 24 Dateien sind über die horizontal scrollbar erreichbare Liste zugänglich. Gleichnamige Dateien aus verschiedenen Ordnern bleiben getrennt.
 - Die Ablage bleibt nach Neustart erhalten. Fehlende Dateien bleiben als nicht verfügbare Einträge sichtbar und lassen sich entfernen.
 
-Normale App-Daten liegen in `~/Library/Application Support/Lilt/focus.json` und `shelf.json`. Es findet kein Upload statt.
+Normale App-Daten liegen in `~/Library/Application Support/Lilt/focus.json`, `shelf.json` und `settings.json`. Einstellungen und lokale Verweise werden nicht hochgeladen.
 
 ## Prüfen
 
 ```sh
 swift test
-node --test scripts/test-ui.mjs scripts/test-focus.mjs
+node --test scripts/test-ui.mjs scripts/test-focus.mjs scripts/test-settings.mjs
 build/Lilt.app/Contents/MacOS/Lilt --smoke-test
 ```
 
@@ -76,10 +87,12 @@ Diagnoseläufe schließen eine bereits regulär laufende Instanz nicht selbst. V
 - `--ui-test-dir /tmp/lilt-review --simulate-brainfm --simulate-meld` prüft die Oberfläche mit ausdrücklich simuliertem nativen Player. `node scripts/native-command.mjs /tmp/lilt-review scripts/check-native-ui.js` führt den zusammenhängenden UI-Lauf aus.
 - `scripts/check-native-tabs.js` und `scripts/check-native-motion.js` prüfen die unveränderten Tab-/Formübergänge.
 - `scripts/check-native-focus-choices.js` prüft Timer-/Aktivitätsmenüs, Tastatur, eigene Dauer, Lesbarkeit und die stabile Play-Position im tatsächlichen WKWebView. Dafür dieselbe ausdrücklich simulierte Brain.fm-Testinstanz verwenden.
+- `scripts/check-native-settings.js` prüft bestätigte Konfiguration, Validierung, Tastatur, Sperren und Animationszwischenstände. Mit `node scripts/native-command.mjs TEST_DIRECTORY scripts/check-native-settings.js EVIDENCE_NAME settings` im Einstellungsfenster ausführen.
+- `scripts/check-native-independent-focus.js` prüft unabhängigen Timer, Pause/Fortsetzen, Abschluss und freie Klickflächen. Dafür eine Testinstanz ohne `--simulate-brainfm` und ohne aktivierte Brain.fm-Verbindung verwenden.
 - `--ui-test-dir /tmp/lilt-review --live-brainfm` steuert die echte App und kann Audio starten. Nur für gezielte autorisierte Verbindungstests verwenden.
-- Ohne diese Zusätze unterdrückt Diagnose-/Smoke-Modus sowohl die Brain.fm- als auch Meld-Steuerung. `--live-meld` erlaubt gezielt die echte Meld-Verbindung; `--simulate-meld` wählt den getrennten Testplayer. `scripts/check-native-meld.js` prüft dessen leere, getrennte, externe und fehlerhafte Zustände ausdrücklich simuliert.
+- Ohne diese Zusätze unterdrückt Diagnose-/Smoke-Modus alle echten Player. `--live-music` erlaubt gezielt Spotify/Apple Music, `--live-meld` die echte Meld-Verbindung; `--simulate-meld` wählt den getrennten Testplayer. `scripts/check-native-meld.js` prüft dessen leere, getrennte, externe und fehlerhafte Zustände ausdrücklich simuliert.
 - Diagnosemodus speichert unter `TEST_DIRECTORY/data`. Smoke verwendet ein eigenes temporäres Verzeichnis. `--data-dir /private/tmp/lilt-review-data` wählt auch im normalen App-Betrieb einen isolierten Speicher, ohne echte Musiksteuerung zu unterdrücken. Das erlaubt echte Maus-/Tastatur- und Neustartprüfungen ohne Produktdaten zu verändern.
-- Simulationsbefehle `testFocus` beziehungsweise `testMusic` werden ausschließlich bei `--ui-test-dir` zusammen mit `--simulate-brainfm` beziehungsweise `--simulate-meld` angenommen. Sie sind kein Nachweis echter Musiksteuerung.
+- Simulationsbefehle `testFocus` beziehungsweise `testMusic` werden ausschließlich bei `--ui-test-dir` zusammen mit `--simulate-brainfm` beziehungsweise `--simulate-meld` angenommen. Beim unabhängigen Timer erlaubt `testFocus` im Diagnosemodus ausschließlich eine begrenzte Restzeit für die Abschlussprüfung. Diese Befehle sind kein Nachweis echter Musiksteuerung.
 
 Bei eingeschränkten Schreibrechten können die Swift-Caches auf ein temporäres Verzeichnis gelegt werden:
 
@@ -91,7 +104,7 @@ Das Build-Skript verwendet eine eindeutig vorhandene Apple-Entwicklungssignatur.
 
 ## Aufbau
 
-AppKit verwaltet Fenster, Hardwaregeometrie, Menü, Dateiauswahl, lokale Sitzungs-/Dateispeicherung und Brain.fm-/Meld-Steuerung. `FocusCoordinator` ist die einzige Autorität für Timer, Befehlsbestätigung und Wiederherstellung. `MusicCoordinator` verwaltet den bestätigten Meld-Zustand; `MeldController` prüft das feste Android-Ziel und ruft den gebündelten `MeldBridge` auf. `ShelfStore` verwaltet lokale Dateiverweise. Ein lokales WKWebView zeichnet die Notch mit gebündelter Schrift und CSS und zeigt die bestätigten nativen Zustände. Keine entfernte Webseite wird in Lilt geladen.
+AppKit verwaltet Fenster, Hardwaregeometrie, Menü, Dateiauswahl und lokale Speicherung. `SettingsStore` speichert validierte Einstellungen atomar. `SettingsWindowController` zeigt die lokale Einstellungsoberfläche. `FocusCoordinator` ist die Autorität für Timer, optionale Musikbestätigung und Wiederherstellung. `MusicCoordinator` verwaltet die gewählte Quelle; `DirectMusicController` sendet gezielte Apple Events an Spotify oder Apple Music, `MeldController` prüft das feste Android-Ziel und verwendet den gebündelten `MeldBridge`. `ShelfStore` verwaltet lokale Dateiverweise. Die lokalen WKWebViews zeigen bestätigte native Zustände. Keine entfernte Webseite wird geladen.
 
 Quellen und Motion-Vertrag: [docs/REFERENCE.md](docs/REFERENCE.md). Schnittstelle: [docs/BRIDGE.md](docs/BRIDGE.md). Aktueller Prüfstand und Grenzen: [STATUS.md](STATUS.md).
 

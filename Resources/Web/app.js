@@ -1,5 +1,5 @@
-import { VIEWS, clock, elapsedAt, freshMusic, musicSnapshot, musicPriority, musicAction } from './model.mjs';
-import { freshFocus, focusSnapshot, focusLocked, focusPriority, focusAction } from './focus-state.mjs';
+import { VIEWS, clock, elapsedAt, freshMusic, musicSnapshot, musicAction } from './model.mjs';
+import { freshFocus, focusSnapshot, focusLocked, focusAction } from './focus-state.mjs';
 
 const root = document.documentElement;
 const notch = document.querySelector('#notch');
@@ -13,9 +13,11 @@ const state = {
   view: 'music', open: false,
   music: freshMusic(),
   focus: freshFocus(),
+  settings: { musicSource: 'meld', sourceName: 'Meld', brainFMEnabled: true },
   shelf: [], shelfMessage: null,
 };
 const focusMenu = { kind: null, custom: false };
+const menuAnimations = new WeakMap();
 const reduced = () => reducedMotion.matches || root.classList.contains('reduce-motion');
 const native = message => window.webkit?.messageHandlers?.lilt?.postMessage(message);
 const each = (name, apply) => document.querySelectorAll(`[data-live="${name}"]`).forEach(apply);
@@ -23,14 +25,15 @@ const text = (name, value) => each(name, element => { if (element.textContent !=
 const icon = (name, value) => each(name, element => element.setAttribute('href', value));
 const elapsed = () => elapsedAt(state.music, performance.now());
 const remaining = () => state.focus.remaining;
-const compactView = () => focusPriority(state.focus) ? 'focus' : musicPriority(state.music) ? 'music' : state.view;
+const sourceName = () => state.music.sourceName || state.settings.sourceName;
+const brainFMEnabled = () => state.focus.brainFMEnabled ?? state.settings.brainFMEnabled;
 function announce(message) { document.querySelector('[data-announce]').textContent = message; }
 window.addEventListener('error', event => errors.push(event.message));
 window.addEventListener('unhandledrejection', event => errors.push(String(event.reason)));
 
 function renderWings() {
   const { music, shelf } = state;
-  const view = compactView();
+  const view = state.view;
   for (const wing of notch.querySelectorAll('[data-wing], [data-compact]')) {
     const side = wing.dataset.wing || wing.dataset.compact;
     const key = `${side}-${view}-${music.id}-${music.cover}-${music.playing}-${music.availability}-${state.focus.phase}-${Boolean(state.focus.error)}-${shelf.length}`;
@@ -45,11 +48,11 @@ function renderWings() {
       if (wing.dataset.key === key) continue;
       wing.innerHTML = '<span class="wave"><i></i><i></i><i></i><i></i><i></i></span>';
     } else {
-      wing.textContent = view === 'music' ? music.availability === 'ready' ? clock(elapsed()) : 'Meld' : view === 'focus' ? state.focus.error ? '!' : state.focus.phase === 'completed' ? 'Done' : clock(remaining()) : shelf.length ? String(shelf.length) : '';
+      wing.textContent = view === 'music' ? music.availability === 'ready' ? clock(elapsed()) : sourceName() : view === 'focus' ? state.focus.error ? '!' : state.focus.phase === 'completed' ? 'Done' : clock(remaining()) : shelf.length ? String(shelf.length) : '';
     }
     wing.dataset.key = key;
   }
-  text('compact-label', `Open the notch: ${view}, ${view === 'music' ? music.title || 'Meld' : view === 'focus' ? clock(remaining()) : `${shelf.length} files`}`);
+  text('compact-label', `Open the notch: ${view}, ${view === 'music' ? music.title || sourceName() : view === 'focus' ? clock(remaining()) : `${shelf.length} files`}`);
 }
 
 function render() {
@@ -57,9 +60,10 @@ function render() {
   const connected = music.availability === 'ready';
   const running = state.focus.phase === 'running';
   const left = remaining();
-  text('title', connected ? music.title : 'Meld');
-  const emptyNote = { checking: 'Connecting…', offline: 'Not running', empty: 'Choose a song in Meld', unavailable: 'Connection unavailable', disabled: 'Player disabled in this test' }[music.availability];
-  text('artist', connected ? [music.artist, 'Meld'].filter(Boolean).join(' · ') : emptyNote || 'Meld');
+  const provider = sourceName();
+  text('title', connected ? music.title : provider);
+  const emptyNote = { checking: 'Connecting…', offline: 'Not running', empty: `Choose a song in ${provider}`, unavailable: 'Connection unavailable', disabled: 'Player disabled in this test' }[music.availability];
+  text('artist', connected ? [music.artist, provider].filter(Boolean).join(' · ') : emptyNote || provider);
   text('elapsed', clock(elapsed()));
   text('duration', music.duration > 0 ? clock(music.duration) : '–:––');
   each('bar', element => element.style.setProperty('--p', music.duration > 0 ? elapsed() / music.duration : 0));
@@ -68,49 +72,55 @@ function render() {
   else artwork.removeAttribute('src');
   artwork.hidden = !music.cover;
   document.querySelector('.cover svg').toggleAttribute('hidden', Boolean(music.cover));
-  const note = music.error?.message || (music.buffering ? 'Loading Meld…' : music.pending ? 'Waiting for Meld…' : '');
+  const note = music.error?.message || (music.buffering ? `Loading ${provider}…` : music.pending ? `Waiting for ${provider}…` : '');
   text('music-note', note);
   const musicNote = document.querySelector('.music-note');
   musicNote.hidden = !note && connected;
   musicNote.title = note;
   const progress = document.querySelector('.progress');
+  progress.setAttribute('aria-label', `${provider} playback position`);
   progress.hidden = !connected || Boolean(note);
   progress.setAttribute('aria-valuetext', `${clock(elapsed())}${music.duration > 0 ? ` of ${clock(music.duration)}` : ', duration unknown'}`);
   if (music.duration > 0) { progress.setAttribute('aria-valuenow', elapsed()); progress.setAttribute('aria-valuemax', music.duration); }
   else { progress.removeAttribute('aria-valuenow'); progress.removeAttribute('aria-valuemax'); }
   document.querySelector('[data-action="meld-open"]').hidden = connected && !music.error;
-  document.querySelector('.track-meta').title = connected ? [music.title, music.artist, music.album].filter(Boolean).join(' · ') : emptyNote || 'Meld';
+  document.querySelector('[data-action="meld-open"]').textContent = `Open ${provider}`;
+  document.querySelector('.track-meta').title = connected ? [music.title, music.artist, music.album].filter(Boolean).join(' · ') : emptyNote || provider;
   icon('play-icon', state.music.playing ? '#i-pause' : '#i-play');
   icon('focus-icon', running ? '#i-pause' : '#i-play');
   text('focus', clock(left));
   const pending = state.focus.pending;
   const error = state.focus.error;
-  const focusNote = state.focus.restoring ? 'Checking Brain.fm…' : pending ? pending.action === 'start' ? 'Starting Brain.fm…' : 'Pausing Brain.fm…' : error ? error.code === 'permission' ? 'Allow Lilt in Accessibility.' : error.message : '';
+  const withMusic = brainFMEnabled();
+  const focusNote = state.focus.restoring ? withMusic ? 'Checking Brain.fm…' : 'Restoring timer…' : pending ? withMusic ? pending.action === 'start' ? 'Starting Brain.fm…' : 'Pausing Brain.fm…' : 'Updating timer…' : error ? error.code === 'permission' ? 'Allow Lilt in Accessibility.' : error.message : '';
   text('focus-note', focusNote);
   document.querySelector('.focus-note').hidden = !focusNote;
   document.querySelector('.focus-note').title = error?.message || '';
   document.querySelector('.focus-note').classList.toggle('has-error', Boolean(error));
-  document.querySelector('[data-action="brainfm-settings"]').hidden = error?.code !== 'permission';
-  document.querySelector('[data-action="brainfm-open"]').hidden = !error || error.code === 'permission';
+  document.querySelector('[data-action="brainfm-settings"]').hidden = !withMusic || error?.code !== 'permission';
+  document.querySelector('[data-action="brainfm-open"]').hidden = !withMusic || !error || error.code === 'permission';
   const minutes = state.focus.duration / 60;
   const durationLabel = `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
   text('focus-activity', state.focus.activity === 'lightWork' ? 'Light Work' : 'Deep Work');
   document.querySelector('#focus-duration').setAttribute('aria-label', `Focus duration, ${durationLabel}. ${clock(left)} remaining.`);
-  document.querySelector('#focus-activity').setAttribute('aria-label', `Brain.fm activity, ${state.focus.activity === 'lightWork' ? 'Light Work' : 'Deep Work'}`);
+  document.querySelector('#focus-activity').setAttribute('aria-label', `Focus activity, ${state.focus.activity === 'lightWork' ? 'Light Work' : 'Deep Work'}`);
+  document.querySelector('#focus-activity-menu').setAttribute('aria-label', 'Focus activity');
   renderFocusMenu();
   const play = document.querySelector('[data-action="play"]');
   play.disabled = Boolean(music.pending) || music.buffering || !connected || !(music.playing ? music.canPause : music.canPlay);
   play.setAttribute('aria-busy', String(Boolean(music.pending) || music.buffering));
-  play.setAttribute('aria-label', music.pending ? 'Waiting for Meld' : music.playing ? 'Pause Meld' : 'Play Meld');
-  play.title = music.playing ? 'Pause Meld' : 'Play Meld';
+  play.setAttribute('aria-label', music.pending ? `Waiting for ${provider}` : music.playing ? `Pause ${provider}` : `Play ${provider}`);
+  play.title = music.playing ? `Pause ${provider}` : `Play ${provider}`;
+  document.querySelector('[data-action="prev"]').setAttribute('aria-label', `Previous ${provider} track`);
+  document.querySelector('[data-action="next"]').setAttribute('aria-label', `Next ${provider} track`);
   document.querySelector('[data-action="prev"]').disabled = Boolean(music.pending) || !connected || !music.canPrevious;
   document.querySelector('[data-action="next"]').disabled = Boolean(music.pending) || !connected || !music.canNext;
   play.setAttribute('aria-pressed', String(state.music.playing));
   const focus = document.querySelector('[data-action="focus"]');
   focus.disabled = Boolean(pending) || !state.focus.ready || state.focus.restoring;
   focus.setAttribute('aria-busy', String(Boolean(pending)));
-  focus.setAttribute('aria-label', pending ? 'Waiting for Brain.fm' : error ? 'Retry Brain.fm control' : running ? 'Pause focus and Brain.fm' : 'Start focus and Brain.fm');
-  focus.title = pending ? 'Waiting for Brain.fm' : running ? 'Pause timer and Brain.fm' : 'Start Brain.fm in the background';
+  focus.setAttribute('aria-label', pending ? withMusic ? 'Waiting for Brain.fm' : 'Updating focus timer' : error ? withMusic ? 'Retry Brain.fm control' : 'Retry focus timer' : running ? withMusic ? 'Pause focus and Brain.fm' : 'Pause focus timer' : withMusic ? 'Start focus and Brain.fm' : 'Start focus timer');
+  focus.title = pending ? withMusic ? 'Waiting for Brain.fm' : 'Updating timer' : running ? withMusic ? 'Pause timer and Brain.fm' : 'Pause timer' : withMusic ? 'Start Brain.fm in the background' : 'Start timer';
   document.querySelector('[data-action="focus-reset"]').disabled = Boolean(pending) || !state.focus.ready || state.focus.restoring;
   document.querySelector('[data-action="focus-reset"]').setAttribute('aria-label', `Reset the focus timer to ${durationLabel}`);
   root.classList.toggle('music-playing', state.music.playing);
@@ -185,7 +195,7 @@ function receiveShelfSnapshot(value) {
 
 function setView(view, { focus = false, animate = true } = {}) {
   if (!VIEWS.includes(view)) return;
-  closeFocusMenu();
+  closeFocusMenu({ animate: false });
   const index = VIEWS.indexOf(view);
   const instant = !animate || reduced() || !state.open;
   notch.classList.toggle('instant-view', instant);
@@ -214,7 +224,7 @@ function setView(view, { focus = false, animate = true } = {}) {
 }
 
 function setOpen(open, { focus = false } = {}) {
-  if (!open) closeFocusMenu();
+  if (!open) closeFocusMenu({ animate: false });
   if (state.open === open) return;
   state.open = Boolean(open);
   notch.dataset.state = open ? 'open' : 'compact';
@@ -264,7 +274,14 @@ function receiveFocusSnapshot(value) {
   state.focus = snapshot;
   render();
   if (snapshot.error && snapshot.error.message !== before.error?.message) announce(snapshot.error.message);
-  else if (snapshot.phase === 'completed' && before.phase !== 'completed') announce('Focus session complete. Brain.fm paused.');
+  else if (snapshot.phase === 'completed' && before.phase !== 'completed') announce(brainFMEnabled() ? 'Focus session complete. Brain.fm paused.' : 'Focus session complete.');
+}
+
+function receiveSettingsSnapshot(value) {
+  if (!value || !['spotify', 'appleMusic', 'meld'].includes(value.musicSource) || typeof value.brainFMEnabled !== 'boolean') return;
+  const names = { spotify: 'Spotify', appleMusic: 'Apple Music', meld: 'Meld' };
+  state.settings = { musicSource: value.musicSource, sourceName: names[value.musicSource], brainFMEnabled: value.brainFMEnabled };
+  render();
 }
 
 function controlFocus(command) {
@@ -272,25 +289,57 @@ function controlFocus(command) {
   native({ action: 'focusAction', command });
 }
 
-function configureFocus({ activity = state.focus.activity, minutes = state.focus.duration / 60 } = {}) {
+function configureFocus({ activity = state.focus.activity, minutes = state.focus.duration / 60 } = {}, { animate = false } = {}) {
   if (focusLocked(state.focus)) return false;
   const custom = document.querySelector('#focus-minutes');
   if (!Number.isInteger(minutes) || minutes < 1 || minutes > 180) { custom.setCustomValidity('Choose 1–180 minutes.'); custom.reportValidity(); return false; }
   custom.setCustomValidity('');
   if (activity !== state.focus.activity || minutes !== state.focus.duration / 60) native({ action: 'focusConfigure', activity, minutes });
-  closeFocusMenu({ restoreFocus: true });
+  closeFocusMenu({ restoreFocus: true, animate });
   return true;
 }
 
-function closeFocusMenu({ restoreFocus = false } = {}) {
+function animateFocusMenu(menu, open, animate) {
+  const previous = menuAnimations.get(menu);
+  const style = getComputedStyle(menu);
+  const from = menu.hidden ? { opacity: 0, transform: 'scale(.95)' } : { opacity: style.opacity, transform: style.transform };
+  previous?.cancel();
+  menuAnimations.delete(menu);
+  menu.hidden = false;
+  menu.inert = !open;
+  menu.setAttribute('aria-hidden', String(!open));
+  menu.dataset.menuState = open ? 'open' : 'closed';
+  const to = { opacity: open ? 1 : 0, transform: open ? 'scale(1)' : 'scale(.95)' };
+  Object.assign(menu.style, to);
+  const finish = () => {
+    if (menu.dataset.menuState === 'closed') menu.hidden = true;
+    if (!focusMenu.kind && [...document.querySelectorAll('.focus-menu')].every(item => item.hidden)) delete document.querySelector('#view-focus').dataset.menuOpen;
+  };
+  if (!animate || reduced()) { finish(); return; }
+  const animation = menu.animate([from, to], { duration: open ? 200 : 150, easing: open ? 'cubic-bezier(.23,1,.32,1)' : 'ease-in' });
+  menuAnimations.set(menu, animation);
+  const complete = () => {
+    if (menuAnimations.get(menu) !== animation) return;
+    menuAnimations.delete(menu);
+    finish();
+  };
+  animation.finished.then(complete, complete);
+}
+
+function closeFocusMenu({ restoreFocus = false, animate = true } = {}) {
   const kind = focusMenu.kind;
-  if (!kind) return;
+  if (!kind) {
+    if (!animate) for (const menu of document.querySelectorAll('.focus-menu')) {
+      if (!menu.hidden) animateFocusMenu(menu, false, false);
+    }
+    return;
+  }
   focusMenu.kind = null;
-  focusMenu.custom = false;
   delete document.querySelector('#view-focus').dataset.menuOpen;
-  document.querySelectorAll('.focus-menu').forEach(menu => { menu.hidden = true; });
+  const menu = document.querySelector(`#focus-${kind}-menu`);
+  animateFocusMenu(menu, false, animate);
   document.querySelectorAll('.focus-trigger').forEach(trigger => trigger.setAttribute('aria-expanded', 'false'));
-  if (restoreFocus) {
+  if (restoreFocus && state.open && state.view === 'focus') {
     const trigger = document.querySelector(`#focus-${kind}`);
     (focusLocked(state.focus) ? document.querySelector('#tab-focus') : trigger).focus({ preventScroll: true });
   }
@@ -303,45 +352,53 @@ function renderFocusMenu() {
   const minutes = state.focus.duration / 60;
   for (const option of document.querySelectorAll('#focus-activity-menu [data-activity]')) option.setAttribute('aria-checked', String(option.dataset.activity === state.focus.activity));
   for (const option of document.querySelectorAll('#focus-duration-menu [data-minutes]')) option.setAttribute('aria-checked', String(option.dataset.minutes === ([25, 50].includes(minutes) ? String(minutes) : 'custom')));
-  document.querySelector('#focus-config').hidden = !focusMenu.custom;
-  document.querySelector('[data-action="focus-custom"]').hidden = focusMenu.custom;
+  if (focusMenu.kind === 'duration') {
+    document.querySelector('#focus-config').hidden = !focusMenu.custom;
+    document.querySelector('[data-action="focus-custom"]').hidden = focusMenu.custom;
+  }
   const input = document.querySelector('#focus-minutes');
   if (!focusMenu.custom) input.value = minutes;
   input.disabled = locked;
   if (!focusMenu.kind) return;
   document.querySelector('#view-focus').dataset.menuOpen = focusMenu.kind;
   const menu = document.querySelector(`#focus-${focusMenu.kind}-menu`);
-  const trigger = document.querySelector('#focus-activity');
+  const trigger = document.querySelector(`#focus-${focusMenu.kind}`);
   const view = document.querySelector('#view-focus').getBoundingClientRect();
   const anchor = trigger.getBoundingClientRect();
-  const bounds = menu.getBoundingClientRect();
-  menu.style.left = `${Math.max(0, Math.min(anchor.left - view.left, view.width - bounds.width))}px`;
-  menu.style.top = `${Math.max(0, Math.min(anchor.bottom - view.top + 4, view.height - bounds.height))}px`;
+  const left = Math.max(0, Math.min(anchor.left - view.left, view.width - menu.offsetWidth));
+  const top = Math.max(0, Math.min(anchor.bottom - view.top + 4, view.height - menu.offsetHeight));
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+  menu.style.transformOrigin = `${anchor.left + anchor.width / 2 - view.left - left}px ${anchor.bottom - view.top - top}px`;
 }
 
-function openFocusMenu(kind, { last = false } = {}) {
+function openFocusMenu(kind, { last = false, animate = false } = {}) {
   if (focusLocked(state.focus)) return;
-  if (focusMenu.kind === kind) { closeFocusMenu({ restoreFocus: true }); return; }
-  closeFocusMenu();
+  if (focusMenu.kind === kind) { closeFocusMenu({ restoreFocus: true, animate }); return; }
+  if (focusMenu.kind) closeFocusMenu({ animate: false });
   focusMenu.kind = kind;
+  focusMenu.custom = false;
   const input = document.querySelector('#focus-minutes');
   input.value = state.focus.duration / 60;
   input.setCustomValidity('');
   const menu = document.querySelector(`#focus-${kind}-menu`);
+  const wasHidden = menu.hidden;
   menu.hidden = false;
+  if (wasHidden) { menu.style.opacity = '0'; menu.style.transform = 'scale(.95)'; }
   document.querySelector(`#focus-${kind}`).setAttribute('aria-expanded', 'true');
   renderFocusMenu();
+  animateFocusMenu(menu, true, animate);
   const options = [...menu.querySelectorAll('[role="menuitemradio"]')];
   (last ? options.at(-1) : options.find(option => option.getAttribute('aria-checked') === 'true') || options[0]).focus({ preventScroll: true });
 }
 
 const actions = {
-  'focus-menu'(event) { openFocusMenu(event.target.closest('[data-menu]').dataset.menu); },
+  'focus-menu'(event) { openFocusMenu(event.target.closest('[data-menu]').dataset.menu, { animate: event.detail > 0 }); },
   'focus-activity'(event) {
-    configureFocus({ activity: event.target.closest('[data-activity]').dataset.activity });
+    configureFocus({ activity: event.target.closest('[data-activity]').dataset.activity }, { animate: event.detail > 0 });
   },
   'focus-duration'(event) {
-    configureFocus({ minutes: Number(event.target.closest('[data-minutes]').dataset.minutes) });
+    configureFocus({ minutes: Number(event.target.closest('[data-minutes]').dataset.minutes) }, { animate: event.detail > 0 });
   },
   'focus-custom'() {
     focusMenu.custom = true;
@@ -352,7 +409,8 @@ const actions = {
   play: () => controlMusic(musicAction(state.music)),
   prev: () => controlMusic('previous'),
   next: () => controlMusic('next'),
-  'meld-open': () => native({ action: 'meldOpen' }),
+  'meld-open': () => native({ action: (state.music.source || state.settings.musicSource) === 'meld' ? 'meldOpen' : 'musicOpen' }),
+  settings: () => native({ action: 'settingsOpen' }),
   focus() {
     controlFocus(focusAction(state.focus));
   },
@@ -366,9 +424,10 @@ const actions = {
 
 document.addEventListener('click', event => {
   const action = event.target.closest?.('[data-action]')?.dataset.action;
-  if (Object.hasOwn(actions, action)) actions[action](event);
+  if (Object.hasOwn(actions, action)) { actions[action](event); return; }
+  if (state.open && notch.contains(event.target) && !event.target.closest('button, input, select, textarea, a, label, [role="button"], [role="menu"], [role="dialog"], [contenteditable="true"], [tabindex]:not([tabindex="-1"]), [data-file-id]')) setOpen(false);
 });
-compact.addEventListener('click', () => { if (compactView() !== state.view) setView(compactView(), { animate: false }); setOpen(true, { focus: true }); });
+compact.addEventListener('click', () => setOpen(true, { focus: true }));
 tabs.forEach((tab, index) => {
   tab.addEventListener('click', event => setView(tab.dataset.view, { animate: event.detail > 0 }));
   tab.addEventListener('keydown', event => {
@@ -381,7 +440,7 @@ tabs.forEach((tab, index) => {
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape') {
     event.preventDefault();
-    if (focusMenu.kind) closeFocusMenu({ restoreFocus: true });
+    if (focusMenu.kind) closeFocusMenu({ restoreFocus: true, animate: false });
     else setOpen(false, { focus: true });
   }
 });
@@ -395,6 +454,14 @@ document.querySelectorAll('.focus-trigger').forEach(trigger => trigger.addEventL
   openFocusMenu(trigger.dataset.menu, { last: event.key === 'ArrowUp' });
 }));
 document.querySelectorAll('.focus-menu').forEach(menu => {
+  menu.inert = true;
+  menu.setAttribute('aria-hidden', 'true');
+  menu.addEventListener('mousedown', event => {
+    const control = event.target.closest('button, input');
+    if (!control || control.disabled || menu.inert) return;
+    if (control.tagName === 'BUTTON') event.preventDefault();
+    control.focus({ preventScroll: true });
+  });
   menu.addEventListener('keydown', event => {
     if (event.key === 'Tab') {
       if (focusMenu.custom) {
@@ -403,7 +470,7 @@ document.querySelectorAll('.focus-menu').forEach(menu => {
         if (event.target === input && !event.shiftKey) { event.preventDefault(); submit.focus(); return; }
         if (event.target === submit && event.shiftKey) { event.preventDefault(); input.focus(); return; }
       }
-      closeFocusMenu({ restoreFocus: true }); return;
+      closeFocusMenu({ restoreFocus: true, animate: false }); return;
     }
     if (event.target.matches('input')) return;
     const options = [...menu.querySelectorAll('[role="menuitemradio"]')].filter(option => !option.hidden);
@@ -419,7 +486,13 @@ document.querySelectorAll('.focus-menu').forEach(menu => {
   }));
 });
 document.querySelector('#focus-minutes').addEventListener('input', event => { if (event.target.validationMessage) event.target.setCustomValidity(''); });
-document.querySelector('#focus-config').addEventListener('submit', event => { event.preventDefault(); configureFocus({ minutes: Number(document.querySelector('#focus-minutes').value) }); });
+let customSubmitByPointer = false;
+document.querySelector('#focus-config button').addEventListener('click', event => { customSubmitByPointer = event.detail > 0; });
+document.querySelector('#focus-config').addEventListener('submit', event => {
+  event.preventDefault();
+  configureFocus({ minutes: Number(document.querySelector('#focus-minutes').value) }, { animate: customSubmitByPointer });
+  customSubmitByPointer = false;
+});
 
 window.Lilt = Object.freeze({
   configure({ hardwareWidth, hardwareHeight, reducedMotion: reduce } = {}) {
@@ -433,6 +506,7 @@ window.Lilt = Object.freeze({
   receiveShelfSnapshot,
   receiveFocusSnapshot,
   receiveMusicSnapshot,
+  receiveSettingsSnapshot,
   setDragging: dragging => notch.classList.toggle('dragging', Boolean(dragging)),
   inspect: () => structuredClone({ ...state, errors, elapsed: elapsed(), remaining: remaining() }),
 });

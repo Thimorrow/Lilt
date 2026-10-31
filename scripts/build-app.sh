@@ -2,13 +2,27 @@
 set -euo pipefail
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
-"$PROJECT_DIR/scripts/build-meld-bridge.sh"
+LILT_ANDROID_SDK="${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}"
+LILT_JDK="${JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}"
+LILT_INCLUDE_MELD=false
+if [ "${LILT_BUILD_MELD:-auto}" != "0" ] && [ -f "$LILT_ANDROID_SDK/platforms/android-34/android.jar" ] && [ -x "$LILT_ANDROID_SDK/build-tools/36.0.0/d8" ] && [ -x "$LILT_JDK/bin/javac" ]; then
+  "$PROJECT_DIR/scripts/build-meld-bridge.sh"
+  LILT_INCLUDE_MELD=true
+elif [ "${LILT_BUILD_MELD:-auto}" = "1" ]; then
+  "$PROJECT_DIR/scripts/build-meld-bridge.sh"
+else
+  printf '%s\n' 'Building Spotify, Apple Music, Focus and Shelf without the optional Meld Android bridge.'
+fi
 swift build -c release
 BIN_DIR="$(swift build -c release --show-bin-path)"
 APP_DIR="$PROJECT_DIR/build/Lilt.app"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp "$BIN_DIR/Lilt" "$APP_DIR/Contents/MacOS/Lilt"
-cp "$PROJECT_DIR/build/meld-bridge/MeldBridge.jar" "$APP_DIR/Contents/Resources/MeldBridge.jar"
+if [ "$LILT_INCLUDE_MELD" = true ]; then
+  cp "$PROJECT_DIR/build/meld-bridge/MeldBridge.jar" "$APP_DIR/Contents/Resources/MeldBridge.jar"
+else
+  rm -f "$APP_DIR/Contents/Resources/MeldBridge.jar"
+fi
 # Replace only this generated app's UI directory so removed assets cannot linger.
 if [ -d "$APP_DIR/Contents/Resources/Web" ]; then
   mv "$APP_DIR/Contents/Resources/Web" "$PROJECT_DIR/build/Web.previous.$(date +%s)"
@@ -29,6 +43,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
 <key>NSPrefersDisplaySafeAreaCompatibilityMode</key><false/>
 <key>LSUIElement</key><true/>
 <key>NSHighResolutionCapable</key><true/>
+<key>NSAppleEventsUsageDescription</key><string>Lilt connects to your selected music app to show the current song and control playback when you ask.</string>
 <key>NSPrincipalClass</key><string>NSApplication</string>
 </dict></plist>
 PLIST

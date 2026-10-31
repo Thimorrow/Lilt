@@ -11,9 +11,10 @@ check('real music controls have Meld accessible names', document.querySelector('
 post({ action: 'testMusic', playing: true }); await until(() => Lilt.inspect().music.playing);
 check('external native playing snapshot runs waveform', Boolean(document.querySelector('.notch-wings .wave')));
 Lilt.setView('shelf'); Lilt.setOpen(false); await wait(600);
-check('active Meld appears while Shelf was selected', Boolean(document.querySelector('[data-compact="left"] .mini-cover')));
+check('selected Shelf stays compact while Meld plays', Lilt.inspect().view === 'shelf' && Boolean(document.querySelector('[data-compact="left"] .glyph')) && !document.querySelector('[data-compact="left"] .mini-cover'));
 document.querySelector('.notch-compact').click(); await wait(600);
-check('compact active Meld opens Music', Lilt.inspect().view === 'music' && Lilt.inspect().open);
+check('compact Shelf reopens Shelf while Meld plays', Lilt.inspect().view === 'shelf' && Lilt.inspect().open && Lilt.inspect().music.playing);
+Lilt.setView('music', { animate: false });
 post({ action: 'testMusic', playing: false }); await until(() => !Lilt.inspect().music.playing);
 check('external pause stops waveform', !document.querySelector('.notch-wings .wave'));
 post({ action: 'testMusic', title: '<img src=x onerror=alert(1)>' });

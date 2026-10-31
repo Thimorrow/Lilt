@@ -196,13 +196,27 @@ final class MusicCoordinator {
     private(set) var pending: MeldCommand?
     private(set) var error: MeldControlError?
     var onChange: (() -> Void)?
-    private let player: MeldControlling
+    private var player: MeldControlling
     private var timer: Timer?
     private var polling = false
     private var generation = UUID()
     private var commandStarted = false
 
     init(player: MeldControlling) { self.player = player }
+
+    @discardableResult
+    func select(player: MeldControlling) -> Bool {
+        guard pending == nil else { return false }
+        generation = UUID()
+        polling = false
+        commandStarted = false
+        self.player = player
+        reading = MeldReading()
+        error = nil
+        onChange?()
+        recheck()
+        return true
+    }
 
     var snapshot: [String: Any] {
         var result = reading.payload
@@ -269,9 +283,7 @@ final class MusicCoordinator {
 
     private func fail(_ error: MeldControlError) {
         self.error = error
-        reading.playing = false
-        reading.buffering = false
-        reading.availability = error == .offline ? .offline : .unavailable
+        reading = MeldReading(availability: error.code == "offline" || error.code == "notInstalled" ? .offline : .unavailable)
     }
 }
 

@@ -5,23 +5,26 @@ Eigenständig einstellbare lokale Mac-App an der Bildschirm-Notch nach https://v
 
 ## Aktuelle Produktrichtung · 2026-10-31
 
-Diese Anforderungen ersetzen die früheren Beschränkungen auf Meld und verpflichtendes Brain.fm. Sie beschreiben das Ziel; der unten dokumentierte bisherige Funktionsumfang ist noch der implementierte Stand.
+Diese Anforderungen ersetzen die früheren Beschränkungen auf Meld und verpflichtendes Brain.fm. Direkte Controller, unabhängiger Timer und zentrale Einstellungen sind implementiert. Tatsächliche Abnahme und offene Live-Nachweise stehen in STATUS.md; spätere Abschnitte dokumentieren auch frühere Anforderungen.
 
 - **Music:** direkte, einfach einzurichtende Unterstützung für Spotify und Apple Music. Diese Anbieter dürfen keine Meld-/Android-Umgebung voraussetzen. Metadaten und Wiedergabebefehle müssen den tatsächlichen Zustand des gewählten Players zeigen beziehungsweise bestätigen.
 - **Focus:** als Timer ohne Brain.fm nutzbar. Brain.fm ist eine optionale Integration. Fehlendes Brain.fm oder dessen Berechtigung darf den unabhängigen Timer nicht blockieren.
-- **Einstellungen:** eine zentrale Ansicht innerhalb von Lilt für die Musikquelle, optionale Integrationen und Fokusvorgaben. Verfügbare Lilt-Optionen müssen dort verständlich konfigurierbar sein. Genaue Aufteilung und weitere Optionen sind vor der UI-Umsetzung festzulegen.
+- **Einstellungen:** eigenes natives Fenster mit Music-/Focus-Navigation, im Lilt-Stil mit gebündelter Schrift, dunklen Flächen und kurzen unterbrechbaren Auswahl-/Ansichtsübergängen. Playerquelle, optionale Brain.fm-Verbindung, Fokusdauer und Aktivität werden nativ bestätigt und gespeichert. Tastatur und reduzierte Bewegung wechseln unmittelbar. Öffnen über Zahnrad, Menü oder ⌘,; Fenstergrößen ab 700 × 540.
+- **Kompaktansicht:** die ausdrücklich gewählte Ansicht bleibt beim Falten und Öffnen erhalten. Music darf durch laufenden, pausierten oder abgeschlossenen Focus nicht verdrängt werden. Das ersetzt den früheren automatischen Fokusvorrang. Freie Innenflächen und Außenklicks schließen die Notch; Bedienelemente bleiben bedienbar. Der sichtbare Fold-Knopf entfällt.
+- **Dropdowns und Popover:** vollständiger Maus-Down/Up-Klick auf Deep Work/Light Work übernimmt die Auswahl, ohne die Notch zu schließen. Eintritt scale .95 → 1 und opacity 0 → 1 in 200 ms mit cubic-bezier(.23,1,.32,1). Austritt scale 1 → .95 und opacity 1 → 0 in 150 ms ease-in. Skalierungsursprung am jeweiligen Auslöser, kein scale(0). Unterbrechbare Umkehr, sofortige Eingabesperre beim Schließen und direkte Umschaltung bei Tastatur/reduzierter Bewegung erhalten.
 - **Einrichtung:** benötigte Apps und Berechtigungen nachvollziehbar anzeigen; kein automatischer Musikstart beim Einrichten oder Neustarten. Keine kopierten Kontoanmeldungen und keine Zugangsdaten im Repository.
 - **Open Source:** Veröffentlichung vom Nutzer freigegeben. Zunächst privates GitHub-Repository als Arbeitsbasis; Lizenz und Drittanbieterhinweise sind noch offen.
 
 ### Akzeptanz der nächsten Umsetzung
 
 - [ ] Spotify auf einem Mac ohne Meld auswählen, tatsächliche Titelinformationen lesen und Play/Pause sowie Vor/Zurück mit bestätigtem Ergebnis ausführen.
-- [ ] Dasselbe für Apple Music; unbekannte, geschlossene oder nicht berechtigte Player ehrlich darstellen.
-- [ ] Musikquelle in Lilt auswählen; Auswahl bleibt nach Neustart erhalten. Anbieterwechsel steuert keinen zuvor ausgewählten Player versehentlich.
-- [ ] Focus ohne installiertes Brain.fm starten, pausieren, fortsetzen und beenden; Dauer und Wiederherstellung nachvollziehbar prüfen.
-- [ ] Optionale Brain.fm-Verbindung ausdrücklich aktivieren; ausgeschaltet keine Brain.fm-Steuerung und keine dafür nötige Berechtigung anfordern.
-- [ ] Einstellungen per Maus und Tastatur bedienen, speichern und nach App-Neustart wiederfinden. Aktuelle Notch-, Tab- und Shelf-Funktionen erhalten.
-- [ ] Automatisierte Prüfungen, tatsächliche Player-Verbindungen und gerenderte Bedienung getrennt nachweisen.
+- [x] Apple Music: tatsächliche Titelinformationen, bestätigtes Play/Pause und Vor/Zurück im signierten App-Prozess geprüft; ursprünglichen Titel/Wiedergabezustand wiederhergestellt. Leere Sitzung und ausdrückliche Automation-Freigabe ebenfalls tatsächlich beobachtet. Fehlende/geschlossene Player zusätzlich in Controller-Tests.
+- [x] Musikquelle in Lilt auswählen; Auswahl bleibt nach tatsächlichem Neustart erhalten. Quellenwechsel-/Pending-/Stale-Reply-Schutz automatisiert geprüft.
+- [x] Focus ohne Brain.fm-Aufrufe starten, pausieren, fortsetzen und beenden; mit deaktiviertem nativen Brain.fm-Transport im echten WKWebView geprüft. Brain.fm ist auf diesem Mac installiert, wurde dafür weder entfernt noch verwendet. Wiederherstellung separat geprüft.
+- [x] Optionale Brain.fm-Verbindung ausdrücklich aktivieren; ausgeschaltet keine Brain.fm-Steuerung und keine dafür nötige Berechtigung anfordern. Native Einstellungen, unabhängiger Lauf und Controller-Aufrufprüfungen bestanden.
+- [x] Einstellungen im echten WKWebView bedienen, speichern und nach tatsächlichem Neustart wiederfinden. Maus-/Tab-Tasteneingabe zusätzlich nativ geprüft; weitere Tastaturinteraktionen im gerenderten JS-Lauf. Notch-, Tab- und Shelf-Regressionen bestanden.
+- [x] Gewählte Music-/Shelf-Ansicht beim Falten und Öffnen erhalten, auch bei laufendem, pausiertem oder abgeschlossenem Focus. Freie Innenfläche/Außenklick schließen; Bedienelemente bleiben offen.
+- [x] Automatisierte Prüfungen, tatsächliche Player-Verbindungen und gerenderte Bedienung getrennt nachweisen. Fehlender Spotify-Livetest und menschliche Designabnahme bleiben ausdrücklich offen.
 
 ## Bisherige Umsetzung
 
@@ -33,7 +36,7 @@ Diese Anforderungen ersetzen die früheren Beschränkungen auf Meld und verpflic
 - Tabs nach Nutzerfeedback: alter Inhalt 70 ms ausblenden, danach neuer Inhalt mit 160 ms opacity und 200 ms transform, 2 px Weg und scale .99. Pille separat 240 ms; Beschriftungen bleiben beim Gleiten lesbar. Umkehrbare CSS-Übergänge, Tastatur und Reduced Motion direkt. Play sitzt in Music und Focus an derselben Position.
 - Cover: 320 ms, ±10 px und scale .9. Musikbalken: 900 ms mit fünf versetzten Phasen.
 - Nach expliziter Hardwarekorrektur #000000, kompakte Höhe gleich safeAreaInsets.top, Radius 10 px. Originalkurven bleiben erhalten.
-- Erster Klick aus anderen Apps muss funktionieren. Oberer Notch-Bereich, Fold und Escape falten. Tabs dürfen nicht versehentlich schließen. Keine doppelten Instanzen.
+- Erster Klick aus anderen Apps muss funktionieren. Oberer Notch-Bereich, freie Innenflächen, Außenklick und Escape falten. Tabs und andere Bedienelemente dürfen nicht versehentlich schließen. Kein sichtbarer Fold-Knopf. Keine doppelten Instanzen.
 - Reduced Motion wird berücksichtigt.
 
 ## Brain.fm
@@ -49,12 +52,12 @@ Diese Anforderungen ersetzen die früheren Beschränkungen auf Meld und verpflic
 - Release-App bauen/starten, Signatur prüfen.
 - Geometrie-/Controller- und Fokus-Zustandstests.
 - Echte WKWebView-Animation und Hardwareposition prüfen.
-- Normale App per Maus/Tastatur bedienen: Öffnen, Tabwechsel, obere Klickfläche, Fold, Escape.
+- Normale App per Maus/Tastatur bedienen: Öffnen, Tabwechsel, obere/freie Klickfläche, Außenklick, Escape und Einstellungen.
 - Reales Brain.fm: Start, Pause, Fortsetzen, Reset, Kaltstart. Simulierte UI-Prüfungen getrennt dokumentieren.
 - Stand und Belege: STATUS.md. Menschliche Designabnahme bleibt beim Nutzer.
 
 ## Bisherige Begrenzungen
-Music unterstützt im aktuellen Quellcode ausschließlich die unten ergänzte Meld-Anbindung. Die neue Produktrichtung erweitert diesen Umfang um Spotify, Apple Music und Einstellungen. Allgemeine Unterstützung beliebiger Player, ein globales Tastenkürzel, Sprachwechsel, Autostart und Installation nach /Applications sind damit nicht zugesagt. Die frühere Begrenzung auf lokale Arbeit wird für die jetzt beauftragte Repository-Erstellung und den initialen Upload aufgehoben. Kein Release oder Merge ist beauftragt.
+Music unterstützt Spotify, Apple Music und die unten dokumentierte Meld-Anbindung. Allgemeine Unterstützung beliebiger Player, ein globales Tastenkürzel, Sprachwechsel, Autostart und Installation nach /Applications sind damit nicht zugesagt. Der aktuelle Feature-Auftrag umfasst lokale Umsetzung und Verifikation, keinen Commit, Push, Release oder Merge.
 
 ## Erweiterung vom 2026-10-30
 
