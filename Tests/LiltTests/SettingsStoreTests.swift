@@ -116,4 +116,20 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertNil(store.error)
         XCTAssertEqual(SettingsStore(file: file).value.focusMinutes, 15)
     }
+
+    func testSignalAndShortcutSwitchesMigrateOnAndRejectNonBooleans() throws {
+        try Data("""
+        {"musicSource":"spotify","brainFMEnabled":false,"focusMinutes":25,"focusActivity":"deepWork"}
+        """.utf8).write(to: file)
+        let store = SettingsStore(file: file)
+        XCTAssertTrue(store.value.focusSound)
+        XCTAssertTrue(store.value.shortcutEnabled)
+        let changed = try store.value.applying(["focusSound": false, "shortcutEnabled": false])
+        XCTAssertTrue(store.save(changed))
+        XCTAssertFalse(SettingsStore(file: file).value.focusSound)
+        XCTAssertFalse(SettingsStore(file: file).value.shortcutEnabled)
+        for change: [String: Any] in [["focusSound": 1], ["shortcutEnabled": "true"], ["openAtLogin": true]] {
+            XCTAssertThrowsError(try changed.applying(change))
+        }
+    }
 }

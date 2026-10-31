@@ -62,7 +62,7 @@ legend{padding:0;font-size:13px;color:var(--muted)}
 .button svg{width:14px;height:14px}
 .button.primary{background:var(--ink);color:#111}
 .button.secondary{background:var(--surface-3);color:var(--ink);border-color:var(--line-strong)}
-.button:active:not(:disabled){transform:scale(.97)}
+.button:active:not(:disabled){transform:scale(.96)}
 .button:disabled{color:var(--quiet);background:var(--surface-2);border-color:var(--line)}
 .context-note{margin:15px 0 0;color:var(--muted);font-size:12px;line-height:1.5;text-wrap:pretty}
 .duration-block{margin:0 0 28px;padding:0}
@@ -120,6 +120,11 @@ legend{padding:0;font-size:13px;color:var(--muted)}
 .switch[aria-checked=true]{background:var(--ink);border-color:var(--ink)}
 .switch[aria-checked=true]>span{background:#25211e;transform:translateX(14px)}
 .switch:disabled{opacity:.55}
+/* Extends the 23px switch to a 41px hit area */
+.switch::before{content:"";position:absolute;inset:-9px -2px}
+.toggle-row{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:72px;padding:15px 0;border-top:1px solid var(--line);font-size:13px}
+.toggle-row label{cursor:pointer}
+kbd{margin-left:4px;padding:2px 6px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface-0);font:inherit;font-size:12px;color:var(--muted)}
 /* 0fr -> 1fr animates the row's natural height without measuring it */
 .integration-detail{display:grid;grid-template-rows:0fr;opacity:0;transition:grid-template-rows 200ms var(--ease),opacity 120ms ease}
 .integration-detail[data-open=true]{grid-template-rows:1fr;opacity:1;transition:grid-template-rows 240ms var(--ease),opacity 180ms ease 60ms}

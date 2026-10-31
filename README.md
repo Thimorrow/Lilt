@@ -14,7 +14,7 @@ This is an early beta. The Intel build has not been tested on an Intel Mac, and 
 
 ## Use Lilt
 
-Click the compact notch to open it. Use the Music, Focus and Shelf tabs, or swipe horizontally on a trackpad. Click outside Lilt, an empty part of the open panel, or press Escape to close it. Click the gear, use the menu-bar icon, or press ⌘, to open settings.
+Click the compact notch or press ⌃⌥L from any app to open it. Use the Music, Focus and Shelf tabs, or swipe horizontally on a trackpad. Click outside Lilt, an empty part of the open panel, or press Escape to close it. Click the gear, use the menu-bar icon, or press ⌘, to open settings. **General** controls the display, opening at login and the shortcut.
 
 ### Music
 
@@ -24,7 +24,7 @@ Meld is an optional, separately configured local Android integration. It is not 
 
 ### Focus
 
-Focus works as a standalone timer. Click the time to choose a preset, a custom duration or work and break intervals. Each interval transition requires you to start the next phase. A running timer continues while the notch is closed and restores its deadline after an app restart.
+Focus works as a standalone timer. Click the time to choose a preset, a custom duration or work and break intervals. Each interval transition requires you to start the next phase. A sound plays when time is up; turn it off in settings. A running timer continues while the notch is closed and restores its deadline after an app restart.
 
 Brain.fm is optional and disabled on new installations. When enabled, Lilt controls the separately installed Brain.fm app using macOS Accessibility permission. Lilt confirms playback before starting the associated work timer. A break does not start music automatically. If Lilt is fully closed at the end of a session, it cannot pause Brain.fm until it runs again.
 

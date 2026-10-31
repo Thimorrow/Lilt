@@ -1,13 +1,14 @@
 export const MUSIC_SOURCES = Object.freeze({ spotify: 'Spotify', appleMusic: 'Apple Music', meld: 'Meld' });
-export const SETTINGS_SECTIONS = ['music', 'focus', 'shelf', 'display'];
-export const freshSettings = () => ({ musicSource: 'spotify', brainFMEnabled: false, focusMinutes: 25, focusActivity: 'deepWork', shelfShortDays: 7, shelfLongDays: 30, displayID: '', displays: [], displayUnavailable: false, musicBusy: false, focusLocked: false, providers: [], brainFM: { installed: false, permission: false }, error: null, saved: false, ready: false });
+export const SETTINGS_SECTIONS = ['music', 'focus', 'shelf', 'general'];
+export const freshSettings = () => ({ musicSource: 'spotify', brainFMEnabled: false, focusMinutes: 25, focusActivity: 'deepWork', shelfShortDays: 7, shelfLongDays: 30, displayID: '', displays: [], focusSound: true, shortcutEnabled: true, openAtLogin: false, shortcutLabel: '⌃⌥L', shortcutConflict: false, displayUnavailable: false, musicBusy: false, focusLocked: false, providers: [], brainFM: { installed: false, permission: false }, error: null, saved: false, ready: false });
 
 export function settingsSnapshot(value) {
   if (!value || !Object.hasOwn(MUSIC_SOURCES, value.musicSource)
     || !['deepWork', 'lightWork'].includes(value.focusActivity)
     || !Number.isInteger(value.focusMinutes) || value.focusMinutes < 1 || value.focusMinutes > 180
     || !['shelfShortDays', 'shelfLongDays'].every(key => Number.isInteger(value[key]) && value[key] >= 1 && value[key] <= 3650)
-    || !['brainFMEnabled', 'musicBusy', 'focusLocked', 'saved'].every(key => typeof value[key] === 'boolean')
+    || !['brainFMEnabled', 'focusSound', 'shortcutEnabled', 'openAtLogin', 'shortcutConflict', 'musicBusy', 'focusLocked', 'saved'].every(key => typeof value[key] === 'boolean')
+    || typeof value.shortcutLabel !== 'string'
     || !Array.isArray(value.providers)
     || typeof value.displayID !== 'string' || !Array.isArray(value.displays) || typeof value.displayUnavailable !== 'boolean'
     || typeof value.brainFM?.installed !== 'boolean' || typeof value.brainFM?.permission !== 'boolean'

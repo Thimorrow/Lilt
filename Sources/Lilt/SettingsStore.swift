@@ -9,16 +9,19 @@ struct LiltSettings: Codable, Equatable {
     var shelfShortDays = 7
     var shelfLongDays = 30
     var displayID = ""
+    var focusSound = true
+    var shortcutEnabled = true
 
     var payload: [String: Any] {
         ["musicSource": musicSource.rawValue, "sourceName": musicSource.title,
          "brainFMEnabled": brainFMEnabled, "focusMinutes": focusMinutes,
          "focusActivity": focusActivity.rawValue, "shelfShortDays": shelfShortDays,
-         "shelfLongDays": shelfLongDays, "displayID": displayID]
+         "shelfLongDays": shelfLongDays, "displayID": displayID,
+         "focusSound": focusSound, "shortcutEnabled": shortcutEnabled]
     }
 
     func applying(_ changes: [String: Any]) throws -> Self {
-        let allowed: Set<String> = ["musicSource", "brainFMEnabled", "focusMinutes", "focusActivity", "shelfShortDays", "shelfLongDays", "displayID"]
+        let allowed: Set<String> = ["musicSource", "brainFMEnabled", "focusMinutes", "focusActivity", "shelfShortDays", "shelfLongDays", "displayID", "focusSound", "shortcutEnabled"]
         guard !changes.isEmpty, Set(changes.keys).isSubset(of: allowed) else { throw SettingsError.invalid }
         var result = self
         if let value = changes["displayID"] {
@@ -29,9 +32,13 @@ struct LiltSettings: Codable, Equatable {
             guard let raw = value as? String, let source = MusicSource(rawValue: raw) else { throw SettingsError.invalid }
             result.musicSource = source
         }
-        if let value = changes["brainFMEnabled"] {
-            guard let number = value as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else { throw SettingsError.invalid }
-            result.brainFMEnabled = number.boolValue
+        for key in ["brainFMEnabled", "focusSound", "shortcutEnabled"] {
+            if let value = changes[key] {
+                guard let number = value as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else { throw SettingsError.invalid }
+                if key == "brainFMEnabled" { result.brainFMEnabled = number.boolValue }
+                else if key == "focusSound" { result.focusSound = number.boolValue }
+                else { result.shortcutEnabled = number.boolValue }
+            }
         }
         if let value = changes["focusMinutes"] {
             guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
@@ -66,6 +73,8 @@ extension LiltSettings {
         shelfShortDays = try container.decodeIfPresent(Int.self, forKey: .shelfShortDays) ?? 7
         shelfLongDays = try container.decodeIfPresent(Int.self, forKey: .shelfLongDays) ?? 30
         displayID = try container.decodeIfPresent(String.self, forKey: .displayID) ?? ""
+        focusSound = try container.decodeIfPresent(Bool.self, forKey: .focusSound) ?? true
+        shortcutEnabled = try container.decodeIfPresent(Bool.self, forKey: .shortcutEnabled) ?? true
     }
 }
 
@@ -75,6 +84,8 @@ struct SettingsError: Error, Equatable {
     static let invalid = Self(code: "invalid", message: "Choose valid settings. Focus duration must be 1 to 180 minutes and Shelf duration 1 to 3650 days.")
     static let storage = Self(code: "storage", message: "Settings could not be saved. Check your disk space and try again.")
     static let musicBusy = Self(code: "music_busy", message: "Wait for the current player command to finish before switching sources.")
+    static let loginItem = Self(code: "login_item", message: "Lilt could not change its login item. Move Lilt to Applications and try again.")
+    static let loginApproval = Self(code: "login_approval", message: "Allow Lilt in System Settings → General → Login Items.")
     static let focusBusy = Self(code: "focus_busy", message: "End or reset your focus session before changing its defaults or Brain.fm connection.")
     var payload: [String: String] { ["code": code, "message": message] }
 }

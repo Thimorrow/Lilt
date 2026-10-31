@@ -14,7 +14,7 @@
   <symbol id="s-music" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></g></symbol>
   <symbol id="s-focus" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.6 1.6M9.5 3h5"/></g></symbol>
   <symbol id="s-shelf" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4zM4 14h5l1.5 2h3l1.5-2h5"/></g></symbol>
-  <symbol id="s-display" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M12 17v3m-4 0h8"/></g></symbol>
+  <symbol id="s-general" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></g></symbol>
   <symbol id="s-check" viewBox="0 0 24 24"><path d="m6 12 4 4 8-8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="s-chevron" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="s-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -32,7 +32,7 @@
       <button id="settings-tab-music" type="button" role="tab" aria-controls="settings-music" aria-selected="true" data-section="music"><svg aria-hidden="true"><use href="#s-music"/></svg><span>Music</span></button>
       <button id="settings-tab-focus" type="button" role="tab" aria-controls="settings-focus" aria-selected="false" tabindex="-1" data-section="focus"><svg aria-hidden="true"><use href="#s-focus"/></svg><span>Focus</span></button>
       <button id="settings-tab-shelf" type="button" role="tab" aria-controls="settings-shelf" aria-selected="false" tabindex="-1" data-section="shelf"><svg aria-hidden="true"><use href="#s-shelf"/></svg><span>Shelf</span></button>
-      <button id="settings-tab-display" type="button" role="tab" aria-controls="settings-display" aria-selected="false" tabindex="-1" data-section="display"><svg aria-hidden="true"><use href="#s-display"/></svg><span>Display</span></button>
+      <button id="settings-tab-general" type="button" role="tab" aria-controls="settings-general" aria-selected="false" tabindex="-1" data-section="general"><svg aria-hidden="true"><use href="#s-general"/></svg><span>General</span></button>
     </nav>
     <div class="sidebar-bottom"><span class="save-state" role="status" aria-live="polite"><svg aria-hidden="true"><use href="#s-check"/></svg><span data-save-state>Loading…</span></span></div>
   </aside>
@@ -66,6 +66,7 @@
         </form>
         <div class="option-card">
           <div class="activity-row"><span id="activity-label">Activity</span><div class="activity-picker" role="radiogroup" aria-labelledby="activity-label"><span class="activity-selection" aria-hidden="true"></span><button type="button" role="radio" aria-checked="true" data-activity="deepWork" disabled>Deep Work</button><button type="button" role="radio" aria-checked="false" tabindex="-1" data-activity="lightWork" disabled>Light Work</button></div></div>
+          <div class="toggle-row"><label id="sound-label" for="sound-toggle">Play sound when time is up</label><button id="sound-toggle" class="switch" type="button" role="switch" aria-checked="false" aria-labelledby="sound-label" data-toggle="focusSound" disabled><span></span></button></div>
           <div class="integration-row"><div class="integration-label"><span class="integration-icon"><svg aria-hidden="true"><use href="#s-brain"/></svg></span><div><label id="brainfm-label" for="brainfm-toggle">Brain.fm</label><span class="integration-caption" data-brainfm-caption>Optional focus music</span></div></div><button id="brainfm-toggle" class="switch" type="button" role="switch" aria-checked="false" aria-labelledby="brainfm-label" disabled><span></span></button></div>
           <div class="integration-detail" data-brainfm-detail data-open="false" inert><div class="integration-detail-inner"><p data-brainfm-message></p><button class="button secondary" type="button" data-action="brainfm-permission" hidden>Allow control<svg aria-hidden="true"><use href="#s-arrow"/></svg></button><button class="button secondary" type="button" data-action="brainfm-open" hidden>Open Brain.fm<svg aria-hidden="true"><use href="#s-arrow"/></svg></button></div></div>
         </div>
@@ -89,11 +90,14 @@
         </div>
         <p class="context-note">Changes apply to files added or kept longer from now on. Original files are never removed.</p>
       </section>
-      <section id="settings-display" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-display" data-active="false" aria-hidden="true" inert>
-        <h1>Display</h1>
+      <section id="settings-general" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-general" data-active="false" aria-hidden="true" inert>
+        <h1>General</h1>
         <div class="option-card">
           <div class="retention-row"><span id="display-label">Show Lilt on</span><div class="menu-field"><button id="displayID-trigger" class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-labelledby="display-label displayID-trigger" data-menu="displayID" disabled><span data-menu-value>Automatic</span><svg aria-hidden="true"><use href="#s-chevron"/></svg></button><div class="settings-menu" role="menu" aria-labelledby="display-label" data-menu-for="displayID" hidden></div></div></div>
+          <div class="toggle-row"><label id="login-label" for="login-toggle">Open at login</label><button id="login-toggle" class="switch" type="button" role="switch" aria-checked="false" aria-labelledby="login-label" data-toggle="openAtLogin" disabled><span></span></button></div>
+          <div class="toggle-row"><label id="shortcut-label" for="shortcut-toggle">Open with <kbd data-shortcut-label>⌃⌥L</kbd></label><button id="shortcut-toggle" class="switch" type="button" role="switch" aria-checked="false" aria-labelledby="shortcut-label" data-toggle="shortcutEnabled" disabled><span></span></button></div>
         </div>
+        <p class="context-note" data-shortcut-conflict hidden>Another app already uses this shortcut.</p>
         <p class="context-note" data-display-unavailable hidden>The selected display is disconnected. Lilt will return when it reconnects.</p>
       </section>
     </div>

@@ -199,4 +199,28 @@ final class IndependentFocusTests: XCTestCase {
         XCTAssertEqual(player.commands, 0)
         XCTAssertEqual(player.reads, 0)
     }
+
+    func testCompletionSignalFiresOnceAtDeadlineButNotOnRestore() {
+        var time = Date(timeIntervalSince1970: 1000)
+        var signals = 0
+        let focus = FocusCoordinator(player: Player(), file: file, brainFMEnabled: false, now: { time })
+        focus.onComplete = { signals += 1 }
+        focus.configure(activity: .deepWork, minutes: 1)
+        focus.request(.start)
+        time = time.addingTimeInterval(30)
+        focus.tick()
+        XCTAssertEqual(signals, 0)
+        time = time.addingTimeInterval(31)
+        focus.tick(); focus.tick()
+        XCTAssertEqual(focus.session.phase, .completed)
+        XCTAssertEqual(signals, 1)
+        focus.request(.reset)
+        focus.request(.start)
+        time = time.addingTimeInterval(120)
+        let restored = FocusCoordinator(player: Player(), file: file, brainFMEnabled: false, now: { time })
+        restored.onComplete = { signals += 1 }
+        restored.tick()
+        XCTAssertEqual(restored.session.phase, .completed)
+        XCTAssertEqual(signals, 1)
+    }
 }

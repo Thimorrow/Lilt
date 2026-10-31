@@ -76,3 +76,11 @@ test('menus keep custom and disconnected values selectable', () => {
   assert.equal(menuOptions('shelfLongDays', { ...state, shelfLongDays: 30 }).filter(option => option.value === 30).length, 1);
   assert.deepEqual(menuOptions('displayID', state), [{ value: '', label: 'Automatic' }, { value: 'a', label: 'Monitor' }, { value: 'gone', label: 'Disconnected display' }]);
 });
+
+test('general switches accept only native booleans and a shortcut label', () => {
+  for (const key of ['focusSound', 'shortcutEnabled', 'openAtLogin', 'shortcutConflict']) {
+    assert.equal(settingsSnapshot(snapshot({ [key]: 'true' })), null);
+    assert.equal(settingsSnapshot(snapshot({ [key]: true }))[key], true);
+  }
+  assert.equal(settingsSnapshot(snapshot({ shortcutLabel: null })), null);
+});

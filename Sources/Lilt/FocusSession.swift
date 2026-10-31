@@ -74,6 +74,8 @@ final class FocusCoordinator {
     private(set) var restoring = false
     private(set) var brainFMEnabled: Bool
     var onChange: (() -> Void)?
+    /// Fires when a running timer reaches its deadline, not when an expired session is restored.
+    var onComplete: (() -> Void)?
     private let player: BrainFMControlling
     private let file: URL
     private let now: () -> Date
@@ -256,6 +258,7 @@ final class FocusCoordinator {
         session.needsFinish = false
         session.verifiedAt = now()
         session.intervals?.completed()
+        onComplete?()
     }
 
     func tick() {

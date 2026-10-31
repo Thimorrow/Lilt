@@ -61,7 +61,8 @@ function sendChanges(changes, { keyboard = false } = {}) {
   localError = null;
   requested = changes;
   keyboardUpdate = keyboard;
-  pendingFocus = keyboard ? Object.hasOwn(changes, 'musicSource') ? `[data-source="${changes.musicSource}"]` : Object.hasOwn(changes, 'focusActivity') ? `[data-activity="${changes.focusActivity}"]` : Object.hasOwn(changes, 'brainFMEnabled') ? '#brainfm-toggle' : Object.hasOwn(changes, 'shelfShortDays') ? '#shelfShortDays-trigger' : Object.hasOwn(changes, 'shelfLongDays') ? '#shelfLongDays-trigger' : Object.hasOwn(changes, 'displayID') ? '#displayID-trigger' : '#default-minutes' : null;
+  const toggle = Object.keys(changes).find(key => find(`[data-toggle="${key}"]`));
+  pendingFocus = keyboard ? toggle ? `[data-toggle="${toggle}"]` : Object.hasOwn(changes, 'musicSource') ? `[data-source="${changes.musicSource}"]` : Object.hasOwn(changes, 'focusActivity') ? `[data-activity="${changes.focusActivity}"]` : Object.hasOwn(changes, 'brainFMEnabled') ? '#brainfm-toggle' : Object.hasOwn(changes, 'shelfShortDays') ? '#shelfShortDays-trigger' : Object.hasOwn(changes, 'shelfLongDays') ? '#shelfLongDays-trigger' : Object.hasOwn(changes, 'displayID') ? '#displayID-trigger' : '#default-minutes' : null;
   render();
   native({ action: 'settingsUpdate', changes });
   clearTimeout(requestTimer);
@@ -155,6 +156,13 @@ function render() {
   renderMusic();
   renderFocus();
   find('[data-display-unavailable]').hidden = !state.displayUnavailable;
+  all('[data-toggle]').forEach(toggle => {
+    const key = toggle.dataset.toggle;
+    toggle.setAttribute('aria-checked', String(shownValue(state, requested, key)));
+    toggle.disabled = !state.ready || (Boolean(requested) && !Object.hasOwn(requested, key));
+  });
+  text('[data-shortcut-label]', state.shortcutLabel);
+  find('[data-shortcut-conflict]').hidden = !state.shortcutConflict || !state.shortcutEnabled;
   all('[data-retention-form]').forEach(form => {
     const key = form.dataset.retentionForm;
     const input = form.querySelector('input');
@@ -266,6 +274,7 @@ find('#default-minutes').addEventListener('keydown', event => {
   find('#default-minutes').setAttribute('aria-invalid', 'false');
   render();
 });
+all('[data-toggle]').forEach(toggle => toggle.addEventListener('click', event => sendChanges({ [toggle.dataset.toggle]: !state[toggle.dataset.toggle] }, { keyboard: event.detail === 0 })));
 find('#brainfm-toggle').addEventListener('click', event => sendChanges({ brainFMEnabled: !state.brainFMEnabled }, { keyboard: event.detail === 0 }));
 all('[data-retention-form]').forEach(form => {
   const key = form.dataset.retentionForm;
