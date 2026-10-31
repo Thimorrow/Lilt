@@ -1,0 +1,40 @@
+Lilt beta for macOS 15 or later
+
+This is an early test version for Apple Silicon and Intel Macs.
+It is ad-hoc signed, not signed with Developer ID or notarized by Apple.
+macOS will require an explicit exception before the first launch.
+
+Install
+1. Open the DMG (or extract the ZIP).
+2. Drag Lilt.app into Applications.
+3. Eject the disk image, then open Lilt from Applications.
+4. If macOS blocks it, first check that you downloaded this release from
+   https://github.com/Thimorrow/Lilt/releases
+   Then open System Settings > Privacy & Security and choose Open Anyway.
+   Confirm the next Open prompt. Managed Macs may not allow this exception.
+
+Apple explains this per-app exception here:
+https://support.apple.com/en-us/102445
+
+Use
+Lilt lives at the top of your screen and in the menu bar, not in the Dock.
+Open settings using the menu bar, the gear button or Command-comma.
+Choose Spotify or Apple Music. Install and open the chosen music app first;
+Connect requests permission to control only that app. Choose a song there.
+Focus works without Brain.fm. Brain.fm is optional and off by default.
+Shelf keeps references to your files; removing entries does not delete them.
+The optional local Meld/Android environment is not included in this beta.
+
+Known limits
+The app has been run on Apple Silicon. The Intel binary is included, but
+has not been run on an Intel Mac. Additional macOS/hardware versions and
+long-running sessions still need testing. A real Spotify playback test is
+still pending. This is a beta, not an Apple-notarized stable release.
+
+Credits
+Original Lilt design and motion study: Vayun Godara
+https://github.com/vayungodara
+https://vayun.net/studies/lilt/
+App code: MIT. Familjen Grotesk: SIL Open Font License 1.1.
+Full licence texts and credits are included inside
+Lilt.app/Contents/Resources/Licenses/.

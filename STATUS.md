@@ -1,5 +1,13 @@
 # Status · 2026-10-31
 
+## Download-Release · in Vorbereitung
+
+- Nutzerauftrag: fertige Mac-App als GitHub-Release veröffentlichen, damit andere sie ohne eigenen Build installieren können. Nach Prüfung der vorhandenen Apple-Zugänge wählte der Nutzer ausdrücklich eine nicht notarisierte Testversion mit macOS-Ausnahme beim ersten Start.
+- Ziel: v0.1.0-beta.1 als GitHub-Prerelease, Universal-App für arm64/x86_64, macOS 15+, DMG und ZIP mit Lizenztexten, Installationsanleitung und SHA-256-Prüfsummen. Kein Anspruch auf Apple-Notarisierung oder bereits erfolgten Intel-Laufzeittest.
+- Umfang: konfigurierbare Build-Metadaten/Universal-Build, getrennte Paketierung aus committiertem sauberem Git-Stand, Download-/Release-Anleitung und passende CI-Prüfung. Keine funktionale App-Änderung und keine Änderung der bestehenden lokalen Entwicklungs-App/Signatur. Release-Bundle-ID io.github.thimorrow.Lilt; lokale Vorschau-ID bleibt erhalten.
+- Ablauf: sequenziell vorbereiten, Quelltests/CI prüfen, sauberen Commit paketieren, DMG/ZIP/Signatur/Lizenzen/Architekturen prüfen, entpackte App mit eigenen Diagnosedaten bedienen, danach neuen Tag und Prerelease mit genau diesen Assets veröffentlichen. Öffentlichen Download erneut laden und Prüfsummen abgleichen. Keine vorhandenen Releases/Tags überschreiben.
+- Ausgangslage: sauberer main auf 771be74; keine bestehenden Releases/Tags. Nur Apple-Development-Zertifikat vorhanden, kein Developer-ID-Zertifikat und kein eingerichtetes Lilt-Notarisierungsprofil. Veröffentlichung deshalb ausschließlich als ausdrücklich freigegebene nicht notarisierte Beta.
+
 ## Open-Source-Veröffentlichung · veröffentlicht und geprüft
 
 - Auftrag: MIT-Lizenz, Credits für Vayun Godara, Schriftlizenz und Abschlussprüfungen ergänzen; committen, pushen und das bestehende Repository öffentlich schalten. Der Nutzer bestätigte Vayuns Erlaubnis und nannte sein Profil https://github.com/vayungodara. Keine erneute Veröffentlichungsfreigabe erforderlich; kein App-Release oder Merge beauftragt.

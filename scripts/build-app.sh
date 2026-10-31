@@ -2,6 +2,19 @@
 set -euo pipefail
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
+LILT_APP_VERSION="${LILT_VERSION:-0.1.0}"
+LILT_APP_BUILD="${LILT_BUILD_NUMBER:-1}"
+LILT_APP_IDENTIFIER="${LILT_BUNDLE_ID:-local.lilt.preview}"
+if ! [[ "$LILT_APP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || ! [[ "$LILT_APP_BUILD" =~ ^[1-9][0-9]*$ ]] || ! [[ "$LILT_APP_IDENTIFIER" =~ ^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$ ]]; then
+  printf '%s\n' 'Invalid app version, build number or bundle identifier.' >&2
+  exit 2
+fi
+LILT_SWIFT_BUILD_ARGS=(-c release)
+case "${LILT_BUILD_UNIVERSAL:-0}" in
+  0) ;;
+  1) LILT_SWIFT_BUILD_ARGS+=(--arch arm64 --arch x86_64) ;;
+  *) printf '%s\n' 'LILT_BUILD_UNIVERSAL must be 0 or 1.' >&2; exit 2 ;;
+esac
 LILT_ANDROID_SDK="${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}"
 LILT_JDK="${JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}"
 LILT_INCLUDE_MELD=false
@@ -13,8 +26,8 @@ elif [ "${LILT_BUILD_MELD:-auto}" = "1" ]; then
 else
   printf '%s\n' 'Building Spotify, Apple Music, Focus and Shelf without the optional Meld Android bridge.'
 fi
-swift build -c release
-BIN_DIR="$(swift build -c release --show-bin-path)"
+swift build "${LILT_SWIFT_BUILD_ARGS[@]}"
+BIN_DIR="$(swift build "${LILT_SWIFT_BUILD_ARGS[@]}" --show-bin-path)"
 APP_DIR="$PROJECT_DIR/build/Lilt.app"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp "$BIN_DIR/Lilt" "$APP_DIR/Contents/MacOS/Lilt"
@@ -51,6 +64,9 @@ cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
 <key>NSPrincipalClass</key><string>NSApplication</string>
 </dict></plist>
 PLIST
+plutil -replace CFBundleIdentifier -string "$LILT_APP_IDENTIFIER" "$APP_DIR/Contents/Info.plist"
+plutil -replace CFBundleShortVersionString -string "$LILT_APP_VERSION" "$APP_DIR/Contents/Info.plist"
+plutil -replace CFBundleVersion -string "$LILT_APP_BUILD" "$APP_DIR/Contents/Info.plist"
 LILT_SIGNING_IDENTITY="${LILT_SIGN_IDENTITY:-}"
 if [ -z "$LILT_SIGNING_IDENTITY" ]; then
   LILT_DEVELOPMENT_IDENTITIES="$(security find-identity -v -p codesigning | awk '/"Apple Development:/{print $2}')"

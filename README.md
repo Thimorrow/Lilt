@@ -6,7 +6,15 @@ Lokale Mac-App für Musik, Fokus und Dateien an der Kameranotch. Die ursprüngli
 
 Lilt verbindet Spotify und Apple Music direkt und bietet zusätzlich die lokale Meld-Anbindung. Focus funktioniert unabhängig; Brain.fm ist optional. Musikquelle, Fokusvorgaben und optionale Verbindungen werden im eigenen Einstellungsfenster gewählt und lokal gespeichert. Anforderungen stehen in [SPEC.md](SPEC.md), der tatsächliche Prüfstand und offene Live-Nachweise in [STATUS.md](STATUS.md).
 
-Der Anwendungscode steht unter [MIT](LICENSE). Credits und abweichende Drittanbieterlizenzen stehen in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Lilt ist ein frühes Projekt zum lokalen Bauen; ein notarisiertes App-Release wird noch nicht angeboten. Ein echter Spotify-Wiedergabetest und zusätzliche Hardware-/Langzeitprüfungen sind noch offen.
+Der Anwendungscode steht unter [MIT](LICENSE). Credits und abweichende Drittanbieterlizenzen stehen in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Lilt ist ein frühes Projekt. Ein echter Spotify-Wiedergabetest und zusätzliche Hardware-/Langzeitprüfungen sind noch offen.
+
+## Mac-App herunterladen
+
+Die [GitHub-Releases](https://github.com/Thimorrow/Lilt/releases) enthalten die Download-Testversion für **macOS 15 oder neuer**, Apple Silicon und Intel. Das DMG öffnen, **Lilt.app nach Programme ziehen**, das Image auswerfen und Lilt aus Programme starten. Alternativ das ZIP entpacken und die App nach Programme kopieren. Xcode und Android werden dafür nicht benötigt.
+
+Die erste Beta ist **nicht von Apple notarisiert** und nur ad-hoc signiert. Wenn macOS den ersten Start blockiert: nach dem Öffnungsversuch unter **Systemeinstellungen → Datenschutz & Sicherheit → Dennoch öffnen** gezielt diese App erlauben. Nur verwenden, wenn du dem Download vertraust. [Apples Anleitung](https://support.apple.com/en-us/102445). Auf verwalteten Macs kann diese Ausnahme gesperrt sein.
+
+Lilt erscheint in der Menüleiste und an der Notch, nicht im Dock. Einstellungen öffnest du über das Zahnrad, das Menüleistensymbol oder ⌘,. Brain.fm ist optional und standardmäßig aus. Die Meld-/Android-Umgebung ist im Download nicht enthalten. Der Intel-Build ist enthalten, aber bisher nicht auf einem echten Intel-Mac geprüft. Weitere Hinweise: [INSTALL-BETA.txt](docs/INSTALL-BETA.txt).
 
 ## Voraussetzungen
 
@@ -104,7 +112,7 @@ Bei eingeschränkten Schreibrechten können die Swift-Caches auf ein temporäres
 env CLANG_MODULE_CACHE_PATH=/private/tmp/lilt-clang SWIFTPM_MODULECACHE_OVERRIDE=/private/tmp/lilt-modules swift test --disable-sandbox --cache-path /private/tmp/lilt-spm --scratch-path /private/tmp/lilt-build
 ```
 
-Das Build-Skript verwendet eine eindeutig vorhandene Apple-Entwicklungssignatur. Alternativ kann `LILT_SIGN_IDENTITY` gesetzt werden. Ohne eindeutige Identität fällt es auf Ad-hoc-Signierung zurück; dabei können macOS-Freigaben nach Neubauten ungültig werden. Eine bereits funktionierende Entwicklungssignatur für Verbindungstests beibehalten. Keine Veröffentlichung oder Notarisierung erfolgt.
+Das Build-Skript verwendet für lokale Builds eine eindeutig vorhandene Apple-Entwicklungssignatur. Alternativ kann `LILT_SIGN_IDENTITY` gesetzt werden. Ohne eindeutige Identität fällt es auf Ad-hoc-Signierung zurück; dabei können macOS-Freigaben nach Neubauten ungültig werden. Eine bereits funktionierende Entwicklungssignatur für Verbindungstests beibehalten. Das Build-Skript veröffentlicht und notarisiert nicht automatisch. Die getrennte Beta-Paketierung ist in [RELEASING.md](docs/RELEASING.md) beschrieben.
 
 ## Aufbau
 
