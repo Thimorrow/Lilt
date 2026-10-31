@@ -1,12 +1,12 @@
 # Lilt
 
-Lokale Mac-App nach der [Lilt-Studie von Vayun Godara](https://vayun.net/studies/lilt/), mit originalen Animationskurven und Anpassung an die echte Kameranotch.
+Lokale Mac-App für Musik, Fokus und Dateien an der Kameranotch. Die ursprüngliche Gestaltung und Bewegungsstudie stammt von **[Vayun Godara](https://github.com/vayungodara)**: [Lilt-Studie](https://vayun.net/studies/lilt/). Diese native Adaption wird mit seiner Erlaubnis veröffentlicht.
 
 ## Produktrichtung
 
 Lilt verbindet Spotify und Apple Music direkt und bietet zusätzlich die lokale Meld-Anbindung. Focus funktioniert unabhängig; Brain.fm ist optional. Musikquelle, Fokusvorgaben und optionale Verbindungen werden im eigenen Einstellungsfenster gewählt und lokal gespeichert. Anforderungen stehen in [SPEC.md](SPEC.md), der tatsächliche Prüfstand und offene Live-Nachweise in [STATUS.md](STATUS.md).
 
-Das GitHub-Repository ist zunächst privat. Der Nutzer hat die Open-Source-Veröffentlichung freigegeben; die Projektlizenz und Hinweise zu übernommenen Assets sind vor der öffentlichen Freigabe noch festzulegen. Herkunft: [docs/REFERENCE.md](docs/REFERENCE.md).
+Der Anwendungscode steht unter [MIT](LICENSE). Credits und abweichende Drittanbieterlizenzen stehen in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Lilt ist ein frühes Projekt zum lokalen Bauen; ein notarisiertes App-Release wird noch nicht angeboten. Ein echter Spotify-Wiedergabetest und zusätzliche Hardware-/Langzeitprüfungen sind noch offen.
 
 ## Voraussetzungen
 
@@ -15,9 +15,13 @@ Benötigt macOS 15+ und Xcode/Swift zum Bauen. Spotify, Apple Music, Focus und S
 ## Starten
 
 ```sh
-./scripts/build-app.sh
+git clone https://github.com/Thimorrow/Lilt.git
+cd Lilt
+LILT_BUILD_MELD=0 LILT_SIGN_IDENTITY=- ./scripts/build-app.sh
 open build/Lilt.app
 ```
+
+Dieser Einstieg benötigt weder Android noch ein Apple-Entwicklerkonto. Er verwendet Ad-hoc-Signierung für den lokalen Build; macOS-Freigaben können nach Neubauten erneut nötig sein. Wer die Meld-Brücke verwenden möchte, kann mit eingerichtetem Android-SDK `./scripts/build-app.sh` ausführen. Weitere Hinweise: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Auf die kompakte Notch klicken. Der obere Bereich, freie Innenflächen, Außenklicks und Escape klappen sie wieder ein. Buttons und andere Bedienelemente bleiben bedienbar; ein eigener Fold-Knopf entfällt. Music, Focus und Shelf wechseln die Ansichten. Das Zahnrad, das Menüleistensymbol oder ⌘, öffnen die Einstellungen. Beenden über das Menüleistensymbol.
 
@@ -109,3 +113,11 @@ AppKit verwaltet Fenster, Hardwaregeometrie, Menü, Dateiauswahl und lokale Spei
 Quellen und Motion-Vertrag: [docs/REFERENCE.md](docs/REFERENCE.md). Schnittstelle: [docs/BRIDGE.md](docs/BRIDGE.md). Aktueller Prüfstand und Grenzen: [STATUS.md](STATUS.md).
 
 Die in den Dokumenten genannten Dateien unter `docs/evidence/` sind lokale Prüfaufnahmen und Diagnoseprotokolle. Sie werden nicht in das Repository hochgeladen. Dort dokumentierte ältere Prüfergebnisse wurden nicht automatisch durch einen neuen Checkout bestätigt.
+
+## Mitwirken und Sicherheit
+
+Beiträge: [CONTRIBUTING.md](CONTRIBUTING.md). Orientierung für Agenten: [AGENTS.md](AGENTS.md). Sicherheitsprobleme: [SECURITY.md](SECURITY.md). Die [GitHub-CI](.github/workflows/ci.yml) prüft automatisierte Tests, den Build ohne Android, mitgelieferte Lizenztexte und Zugangsdaten im Git-Verlauf. Sie ersetzt keine echte Player- oder Hardwareprüfung.
+
+## Credits und Lizenz
+
+Die ursprüngliche Lilt-Studie, ihre Gestaltung und Animationskurven stammen von [Vayun Godara](https://github.com/vayungodara). Familjen Grotesk stammt von den [Familjen Grotesk Project Authors](https://github.com/Familjen-Sthlm/Familjen-Grotesk) und bleibt unter SIL OFL 1.1. Vollständige Hinweise: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Der Anwendungscode wird unter der [MIT-Lizenz](LICENSE) veröffentlicht.

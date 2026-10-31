@@ -28,6 +28,10 @@ if [ -d "$APP_DIR/Contents/Resources/Web" ]; then
   mv "$APP_DIR/Contents/Resources/Web" "$PROJECT_DIR/build/Web.previous.$(date +%s)"
 fi
 cp -R "$PROJECT_DIR/Resources/Web" "$APP_DIR/Contents/Resources/Web"
+mkdir -p "$APP_DIR/Contents/Resources/Licenses"
+cp "$PROJECT_DIR/LICENSE" "$APP_DIR/Contents/Resources/Licenses/LICENSE"
+cp "$PROJECT_DIR/THIRD_PARTY_NOTICES.md" "$APP_DIR/Contents/Resources/Licenses/THIRD_PARTY_NOTICES.md"
+cp "$PROJECT_DIR/Resources/Licenses/Familjen-Grotesk-OFL.txt" "$APP_DIR/Contents/Resources/Licenses/Familjen-Grotesk-OFL.txt"
 cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

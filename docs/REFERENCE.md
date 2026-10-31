@@ -1,6 +1,6 @@
 # Referenz und Nachweis
 
-Original: [Lilt von Vayun Godara](https://vayun.net/studies/lilt/), abgerufen und live geprüft am 2026-10-30.
+Original: [Lilt](https://vayun.net/studies/lilt/) von [Vayun Godara](https://github.com/vayungodara), abgerufen und live geprüft am 2026-10-30. Aktuelle Credits und Lizenzabgrenzung: [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
 
 Die lokale UI adaptiert die Notch-HTML-Struktur, SVG-Symbole, Cover, Schrift und CSS-Animationen aus der öffentlich zugänglichen Studie. Die Website beschreibt die Musik ausdrücklich als stumme Beispieltracks und die Ablage als Namen-Vorschau. Das beschreibt die Herkunftsstudie. Die inzwischen beauftragten nativen Anbindungen für Meld, Brain.fm und lokale Dateiverweise sind im aktuellen README und in SPEC.md beschrieben; die Notch-Gestaltung und ihre Bewegung bleiben an der Studie orientiert.
 
@@ -28,11 +28,11 @@ Bei der beobachteten Desktop-Referenz: offen 560 × 215.43 CSS px, kompakt 376.5
 
 ## Brain.fm
 
-https://www.brain.fm verlinkt offiziell auf https://my.brain.fm. Der native Fokus-Start öffnet diese Adresse nach Nutzerklick. Die Steuerung von Wiedergabe/Login ist ausdrücklich noch nicht implementiert. Kein automatischer Login, keine Kontoeingriffe.
+Focus funktioniert unabhängig. Die optionale Brain.fm-Anbindung steuert die separat installierte App; eine Browserumleitung und die Übernahme von Anmeldedaten gehören nicht zur aktuellen Umsetzung. Verhalten und Nachweise stehen in README.md und STATUS.md.
 
 ## Rechte und Nutzung
 
-Gestaltung und Vorlagenassets stammen aus der Lilt-Studie von Vayun Godara und werden nicht als eigene Gestaltung ausgegeben. Der Nutzer hat am 2026-10-31 die Open-Source-Veröffentlichung freigegeben. Das Repository wird zunächst privat eingerichtet. Die Projektlizenz sowie genaue Lizenz- und Freigabehinweise für übernommene Gestaltung, Schrift und Assets sind vor der öffentlichen Freigabe noch zu dokumentieren. Diese Nutzerfreigabe ist keine pauschale Neulizenzierung fremder Assets.
+Gestaltung und Vorlagenassets stammen aus der Lilt-Studie von Vayun Godara und werden nicht als eigene Gestaltung ausgegeben. Der Projektinhaber hat am 2026-10-31 Vayuns Erlaubnis zur Open-Source-Veröffentlichung bestätigt und MIT als Projektlizenz gewählt. Die hier veröffentlichte Implementierung und ihre Anpassungen werden unter MIT bereitgestellt. Das erklärt nicht pauschal die ursprüngliche Website oder andere Werke des Urhebers zu MIT-lizenzierten Werken. Familjen Grotesk bleibt unter SIL OFL 1.1; der vollständige Text liegt unter Resources/Licenses und wird mit der App gebündelt. Details und Quellen: THIRD_PARTY_NOTICES.md.
 
 ## Native Notch-Platzierung
 
@@ -42,7 +42,7 @@ Der Host setzt `NSPrefersDisplaySafeAreaCompatibilityMode` auf false und erlaubt
 
 Die originale Farb-/Kompaktgeometrie wurde nach ausdrücklichem Feedback angepasst: #000000 statt #060707, kompakte Höhe entspricht der echten Kameranotch statt mindestens44px, Radius10px, ein Klick auf den oberen Bereich faltet. Animationskurven und Inhaltsstaffelung bleiben erhalten.
 
-Der frühere Brain.fm-Weblink wurde durch Steuerung der installierten App ersetzt. Der Nutzer autorisierte Bedienungshilfen sowie „Run in Separate Window“ und „Infinite“. Die überholte Weblink-Beschreibung oben dokumentiert nur den ersten UI-Stand. Aktuelles Verhalten und Nachweise stehen in STATUS.md und evidence/brainfm-normal-verification.md.
+Der frühere Brain.fm-Weblink wurde durch Steuerung der installierten App ersetzt. Der Nutzer autorisierte Bedienungshilfen sowie „Run in Separate Window“ und „Infinite“. Aktuelles Verhalten und Nachweise stehen in STATUS.md und den dort genannten lokalen Diagnoseaufnahmen.
 
 ## Nutzerkorrektur: Inhaltswechsel und Tab-Pille
 

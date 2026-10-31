@@ -1,5 +1,15 @@
 # Status · 2026-10-31
 
+## Open-Source-Veröffentlichung · lokal vorbereitet
+
+- Auftrag: MIT-Lizenz, Credits für Vayun Godara, Schriftlizenz und Abschlussprüfungen ergänzen; committen, pushen und das bestehende Repository öffentlich schalten. Der Nutzer bestätigte Vayuns Erlaubnis und nannte sein Profil https://github.com/vayungodara. Keine erneute Veröffentlichungsfreigabe erforderlich; kein App-Release oder Merge beauftragt.
+- Umfang: LICENSE, THIRD_PARTY_NOTICES.md, unveränderte OFL-1.1 der Schrift, Lizenztexte im App-Bundle, README/Beitrags-/Sicherheitshinweise, Agentenorientierung und minimale GitHub-CI. Keine funktionale UI-/Playeränderung.
+- Vorgehen: sequenziell; bestehende Quellen und Nutzerdaten erhalten. Vollständigen erreichbaren Git-Verlauf und den Veröffentlichungsstand mit Gitleaks prüfen, frischen Quellstand ohne vorhandene Builds testen und ohne Android/Entwicklersignatur bauen. Bundle-Lizenztexte und Signatur vergleichen. Danach Remote-Commit, CI, öffentliche Sichtbarkeit und vertraulichen Meldeweg prüfen.
+- Herkunft: gebündelte Familjen Grotesk Version 2.002, Gewichtsachse 400–700 und Copyright 2021 der Familjen Grotesk Project Authors anhand der tatsächlichen WOFF2-Metadaten geprüft. Originale OFL aus dem Schriftprojekt übernommen. Gestaltung/Bewegung von Vayun Godara werden ausdrücklich genannt.
+- Lokale Abschlussprüfung: Gitleaks 8.30.1 prüfte den vollständigen bisherigen erreichbaren Git-Verlauf (zwei Commits) und alle 63 Dateien des Veröffentlichungsstands ohne Fund. Zusätzliche Prüfung der bisherigen Bäume fand keine Diagnoseaufnahmen, Build-Ausgaben, Signierschlüssel, persönlichen absoluten Pfade oder eingebetteten E-Mail-Adressen. Git-Autorenschaft verwendet die bestehende öffentliche Noreply-Adresse. Das ist kein vollständiges Sicherheits-Audit der Anwendungslogik.
+- Frischer Export des Git-Index ohne vorhandene Builds: 66 Swift- und 12 Node-Tests bestanden; Release ohne Android/Entwicklerzertifikat gebaut. Strikte Ad-hoc-Signatur gültig; alle drei gebündelten Lizenztexte bytegleich mit den Quellen. Unveränderte Original-OFL und lokale Dokumentlinks geprüft. Actionlint 1.7.12 und Shell-Syntax ohne Fehler. Geprüfte Build-Eingaben stimmen mit dem Upload überein.
+- GitHub-CI und öffentliche Sichtbarkeit werden nach dem Push separat verifiziert. Offene Produktgrenzen bleiben: Spotify-Livetest, zusätzliche Langzeit-/Sleep-/Hardwareprüfungen und notarisiertes App-Release. Keine erneute echte Player-/UI-Prüfung, da diese Vorbereitung keine sichtbare App-Funktion ändert. Ältere Nachweise unten sind getrennt davon zu lesen.
+
 ## Commit und Push des neuen Stands
 
 - Nutzer hat den Commit und Push der vorhandenen Änderungen nach `Thimorrow/Lilt` ausdrücklich beauftragt. Diese Freigabe ergänzt die früheren rein lokalen Aufträge unten. Ziel ist der bestehende Hauptzweig `main`; das Repository bleibt privat.

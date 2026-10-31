@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.woff2 binary
+*.png binary
+# Preserve upstream licence text, including its original trailing whitespace.
+Resources/Licenses/*.txt whitespace=-blank-at-eol

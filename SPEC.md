@@ -13,7 +13,7 @@ Diese Anforderungen ersetzen die früheren Beschränkungen auf Meld und verpflic
 - **Kompaktansicht:** die ausdrücklich gewählte Ansicht bleibt beim Falten und Öffnen erhalten. Music darf durch laufenden, pausierten oder abgeschlossenen Focus nicht verdrängt werden. Das ersetzt den früheren automatischen Fokusvorrang. Freie Innenflächen und Außenklicks schließen die Notch; Bedienelemente bleiben bedienbar. Der sichtbare Fold-Knopf entfällt.
 - **Dropdowns und Popover:** vollständiger Maus-Down/Up-Klick auf Deep Work/Light Work übernimmt die Auswahl, ohne die Notch zu schließen. Eintritt scale .95 → 1 und opacity 0 → 1 in 200 ms mit cubic-bezier(.23,1,.32,1). Austritt scale 1 → .95 und opacity 1 → 0 in 150 ms ease-in. Skalierungsursprung am jeweiligen Auslöser, kein scale(0). Unterbrechbare Umkehr, sofortige Eingabesperre beim Schließen und direkte Umschaltung bei Tastatur/reduzierter Bewegung erhalten.
 - **Einrichtung:** benötigte Apps und Berechtigungen nachvollziehbar anzeigen; kein automatischer Musikstart beim Einrichten oder Neustarten. Keine kopierten Kontoanmeldungen und keine Zugangsdaten im Repository.
-- **Open Source:** Veröffentlichung vom Nutzer freigegeben. Zunächst privates GitHub-Repository als Arbeitsbasis; Lizenz und Drittanbieterhinweise sind noch offen.
+- **Open Source:** Veröffentlichung vom Nutzer freigegeben, MIT als Projektlizenz gewählt. Vayun Godara als Urheber der ursprünglichen Studie nennen; seine Erlaubnis zur Veröffentlichung wurde vom Nutzer bestätigt. Familjen Grotesk bleibt unter OFL-1.1. Nach Abschlussprüfungen das bestehende Repository öffentlich schalten; kein notarisiertes App-Release ist damit zugesagt.
 
 ### Akzeptanz der nächsten Umsetzung
 
