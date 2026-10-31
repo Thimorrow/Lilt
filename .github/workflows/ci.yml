@@ -38,7 +38,8 @@ jobs:
       - name: Verify app signature and bundled licences
         run: |
           codesign --verify --deep --strict build/Lilt.app
-          lipo -verify_arch arm64 x86_64 build/Lilt.app/Contents/MacOS/Lilt
+          xcrun lipo build/Lilt.app/Contents/MacOS/Lilt -verify_arch arm64
+          xcrun lipo build/Lilt.app/Contents/MacOS/Lilt -verify_arch x86_64
           cmp LICENSE build/Lilt.app/Contents/Resources/Licenses/LICENSE
           cmp THIRD_PARTY_NOTICES.md build/Lilt.app/Contents/Resources/Licenses/THIRD_PARTY_NOTICES.md
           cmp Resources/Licenses/Familjen-Grotesk-OFL.txt build/Lilt.app/Contents/Resources/Licenses/Familjen-Grotesk-OFL.txt

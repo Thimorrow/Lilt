@@ -30,7 +30,8 @@ LILT_PAYLOAD="$LILT_PACKAGE_STAGE/Lilt-$LILT_RELEASE_VERSION"
 mkdir -p "$LILT_PAYLOAD"
 ditto "$LILT_PACKAGE_STAGE/source/build/Lilt.app" "$LILT_PAYLOAD/Lilt.app"
 codesign --verify --deep --strict "$LILT_PAYLOAD/Lilt.app"
-lipo -verify_arch arm64 x86_64 "$LILT_PAYLOAD/Lilt.app/Contents/MacOS/Lilt"
+xcrun lipo "$LILT_PAYLOAD/Lilt.app/Contents/MacOS/Lilt" -verify_arch arm64
+xcrun lipo "$LILT_PAYLOAD/Lilt.app/Contents/MacOS/Lilt" -verify_arch x86_64
 ln -s /Applications "$LILT_PAYLOAD/Applications"
 cp "$LILT_PACKAGE_STAGE/source/docs/INSTALL-BETA.txt" "$LILT_PAYLOAD/INSTALL.txt"
 mkdir -p "$LILT_RELEASE_OUTPUT"
