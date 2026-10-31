@@ -13,7 +13,10 @@
   <symbol id="s-wordmark" viewBox="0 0 152 100"><g fill="none" stroke="currentColor" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"><path d="M11 12V86M45 54V86M79 12V86M113 24V68Q113 86 131 86M101 48H137"/></g><path d="M30 2H60V18A8 8 0 0 1 52 26H38A8 8 0 0 1 30 18Z" fill="currentColor"/></symbol>
   <symbol id="s-music" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></g></symbol>
   <symbol id="s-focus" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.6 1.6M9.5 3h5"/></g></symbol>
+  <symbol id="s-shelf" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4zM4 14h5l1.5 2h3l1.5-2h5"/></g></symbol>
+  <symbol id="s-display" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M12 17v3m-4 0h8"/></g></symbol>
   <symbol id="s-check" viewBox="0 0 24 24"><path d="m6 12 4 4 8-8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="s-chevron" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="s-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="s-spotify" viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="currentColor"/><g fill="none" stroke="var(--logo-cutout, #131313)" stroke-linecap="round"><path d="M8.5 12.1c5.5-1.6 10.8-1.1 15.4 1.5" stroke-width="2.2"/><path d="M9.6 16.2c4.5-1.3 8.8-.8 12.8 1.2" stroke-width="1.9"/><path d="M10.7 20.1c3.7-.9 6.9-.6 10.1 1" stroke-width="1.6"/></g></symbol>
   <symbol id="s-appleMusic" viewBox="0 0 32 32"><path d="M24.4 4.7v17c0 2.2-1.5 3.7-3.8 4.1-2.2.4-4-.6-4-2.3 0-1.6 1.2-2.8 3.3-3.2l2-.4V11l-11.3 2.4v11c0 2.2-1.6 3.8-3.9 4.1-2.2.4-4-.6-4-2.3 0-1.6 1.3-2.8 3.4-3.2l2-.4V9.3c0-.7.4-1.2 1.1-1.3l13.7-2.9c.8-.2 1.5-.1 1.5-.4Z" fill="currentColor" transform="translate(2 -1)"/></symbol>
@@ -28,8 +31,10 @@
       <span class="nav-selection" aria-hidden="true"></span>
       <button id="settings-tab-music" type="button" role="tab" aria-controls="settings-music" aria-selected="true" data-section="music"><svg aria-hidden="true"><use href="#s-music"/></svg><span>Music</span></button>
       <button id="settings-tab-focus" type="button" role="tab" aria-controls="settings-focus" aria-selected="false" tabindex="-1" data-section="focus"><svg aria-hidden="true"><use href="#s-focus"/></svg><span>Focus</span></button>
+      <button id="settings-tab-shelf" type="button" role="tab" aria-controls="settings-shelf" aria-selected="false" tabindex="-1" data-section="shelf"><svg aria-hidden="true"><use href="#s-shelf"/></svg><span>Shelf</span></button>
+      <button id="settings-tab-display" type="button" role="tab" aria-controls="settings-display" aria-selected="false" tabindex="-1" data-section="display"><svg aria-hidden="true"><use href="#s-display"/></svg><span>Display</span></button>
     </nav>
-    <div class="sidebar-bottom"><span>Settings</span><span class="save-state" role="status" aria-live="polite"><svg aria-hidden="true"><use href="#s-check"/></svg><span data-save-state>Loading…</span></span></div>
+    <div class="sidebar-bottom"><span class="save-state" role="status" aria-live="polite"><svg aria-hidden="true"><use href="#s-check"/></svg><span data-save-state>Loading…</span></span></div>
   </aside>
   <main class="settings-main">
     <div class="section-stack">
@@ -39,9 +44,9 @@
           <legend>Player</legend>
           <div class="player-picker" role="radiogroup" aria-label="Music player">
             <span class="player-selection" aria-hidden="true"></span>
-            <button type="button" class="player-option" role="radio" aria-checked="true" data-source="spotify" disabled><svg class="player-logo" aria-hidden="true"><use href="#s-spotify"/></svg><span>Spotify</span><svg class="option-check" aria-hidden="true"><use href="#s-check"/></svg></button>
-            <button type="button" class="player-option" role="radio" aria-checked="false" tabindex="-1" data-source="appleMusic" disabled><svg class="player-logo" aria-hidden="true"><use href="#s-appleMusic"/></svg><span>Apple Music</span><svg class="option-check" aria-hidden="true"><use href="#s-check"/></svg></button>
-            <button type="button" class="player-option" role="radio" aria-checked="false" tabindex="-1" data-source="meld" disabled><svg class="player-logo" aria-hidden="true"><use href="#s-meld"/></svg><span>Meld</span><svg class="option-check" aria-hidden="true"><use href="#s-check"/></svg></button>
+            <button type="button" class="player-option" role="radio" aria-checked="true" data-source="spotify" disabled><svg class="player-logo" aria-hidden="true"><use href="#s-spotify"/></svg><span class="player-name"><span>Spotify</span><small hidden></small></span></button>
+            <button type="button" class="player-option" role="radio" aria-checked="false" tabindex="-1" data-source="appleMusic" disabled><svg class="player-logo" aria-hidden="true"><use href="#s-appleMusic"/></svg><span class="player-name"><span>Apple Music</span><small hidden></small></span></button>
+            <button type="button" class="player-option" role="radio" aria-checked="false" tabindex="-1" data-source="meld" disabled><svg class="player-logo" aria-hidden="true"><use href="#s-meld"/></svg><span class="player-name"><span>Meld</span><small hidden></small></span></button>
           </div>
         </fieldset>
         <div class="connection-card">
@@ -59,12 +64,37 @@
           <div class="duration-presets" aria-label="Default duration presets"><button type="button" data-minutes="25" aria-pressed="true" disabled>25 min</button><button type="button" data-minutes="50" aria-pressed="false" disabled>50 min</button><button type="button" data-minutes="90" aria-pressed="false" disabled>90 min</button></div>
           <p id="duration-error" class="field-error" role="alert" hidden></p>
         </form>
-        <div class="focus-options">
+        <div class="option-card">
           <div class="activity-row"><span id="activity-label">Activity</span><div class="activity-picker" role="radiogroup" aria-labelledby="activity-label"><span class="activity-selection" aria-hidden="true"></span><button type="button" role="radio" aria-checked="true" data-activity="deepWork" disabled>Deep Work</button><button type="button" role="radio" aria-checked="false" tabindex="-1" data-activity="lightWork" disabled>Light Work</button></div></div>
           <div class="integration-row"><div class="integration-label"><span class="integration-icon"><svg aria-hidden="true"><use href="#s-brain"/></svg></span><div><label id="brainfm-label" for="brainfm-toggle">Brain.fm</label><span class="integration-caption" data-brainfm-caption>Optional focus music</span></div></div><button id="brainfm-toggle" class="switch" type="button" role="switch" aria-checked="false" aria-labelledby="brainfm-label" disabled><span></span></button></div>
-          <div class="integration-detail" data-brainfm-detail hidden><p data-brainfm-message></p><button class="button secondary" type="button" data-action="brainfm-permission" hidden>Allow control<svg aria-hidden="true"><use href="#s-arrow"/></svg></button><button class="button secondary" type="button" data-action="brainfm-open" hidden>Open Brain.fm<svg aria-hidden="true"><use href="#s-arrow"/></svg></button></div>
+          <div class="integration-detail" data-brainfm-detail data-open="false" inert><div class="integration-detail-inner"><p data-brainfm-message></p><button class="button secondary" type="button" data-action="brainfm-permission" hidden>Allow control<svg aria-hidden="true"><use href="#s-arrow"/></svg></button><button class="button secondary" type="button" data-action="brainfm-open" hidden>Open Brain.fm<svg aria-hidden="true"><use href="#s-arrow"/></svg></button></div></div>
         </div>
         <p class="context-note" data-focus-locked hidden>Reset or finish your focus session to change these settings.</p>
+      </section>
+      <section id="settings-shelf" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-shelf" data-active="false" aria-hidden="true" inert>
+        <h1>Shelf</h1>
+        <div class="option-card">
+          <form class="retention-row" data-retention-form="shelfShortDays" novalidate>
+            <label id="shelf-short-label" for="shelf-short-days">New files</label>
+            <div class="menu-field"><button id="shelfShortDays-trigger" class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-labelledby="shelf-short-label shelfShortDays-trigger" data-menu="shelfShortDays" disabled><span data-menu-value>7 days</span><svg aria-hidden="true"><use href="#s-chevron"/></svg></button><div class="settings-menu" role="menu" aria-labelledby="shelf-short-label" data-menu-for="shelfShortDays" hidden></div></div>
+            <div class="retention-control" hidden><input id="shelf-short-days" type="number" inputmode="numeric" min="1" max="3650" step="1" value="7" aria-describedby="shelf-short-error" autocomplete="off" disabled><span>days</span><button class="button secondary" type="submit" hidden>Save</button></div>
+            <p id="shelf-short-error" class="field-error" role="alert" hidden></p>
+          </form>
+          <form class="retention-row" data-retention-form="shelfLongDays" novalidate>
+            <label id="shelf-long-label" for="shelf-long-days">Kept longer</label>
+            <div class="menu-field"><button id="shelfLongDays-trigger" class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-labelledby="shelf-long-label shelfLongDays-trigger" data-menu="shelfLongDays" disabled><span data-menu-value>30 days</span><svg aria-hidden="true"><use href="#s-chevron"/></svg></button><div class="settings-menu" role="menu" aria-labelledby="shelf-long-label" data-menu-for="shelfLongDays" hidden></div></div>
+            <div class="retention-control" hidden><input id="shelf-long-days" type="number" inputmode="numeric" min="1" max="3650" step="1" value="30" aria-describedby="shelf-long-error" autocomplete="off" disabled><span>days</span><button class="button secondary" type="submit" hidden>Save</button></div>
+            <p id="shelf-long-error" class="field-error" role="alert" hidden></p>
+          </form>
+        </div>
+        <p class="context-note">Changes apply to files added or kept longer from now on. Original files are never removed.</p>
+      </section>
+      <section id="settings-display" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-display" data-active="false" aria-hidden="true" inert>
+        <h1>Display</h1>
+        <div class="option-card">
+          <div class="retention-row"><span id="display-label">Show Lilt on</span><div class="menu-field"><button id="displayID-trigger" class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-labelledby="display-label displayID-trigger" data-menu="displayID" disabled><span data-menu-value>Automatic</span><svg aria-hidden="true"><use href="#s-chevron"/></svg></button><div class="settings-menu" role="menu" aria-labelledby="display-label" data-menu-for="displayID" hidden></div></div></div>
+        </div>
+        <p class="context-note" data-display-unavailable hidden>The selected display is disconnected. Lilt will return when it reconnects.</p>
       </section>
     </div>
     <div class="settings-error" role="alert" hidden><svg aria-hidden="true"><use href="#s-error"/></svg><span data-error-message></span></div>

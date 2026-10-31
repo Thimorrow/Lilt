@@ -1,26 +1,26 @@
-# Credits und Drittanbieterhinweise
+# Credits and third-party notices
 
-## Ursprüngliche Lilt-Studie
+## Original Lilt study
 
-Die ursprüngliche Lilt-Gestaltung und Bewegungsstudie stammt von **[Vayun Godara](https://github.com/vayungodara)**: [vayun.net/studies/lilt](https://vayun.net/studies/lilt/).
+The original Lilt design and motion study was created by **[Vayun Godara](https://github.com/vayungodara)**: [vayun.net/studies/lilt](https://vayun.net/studies/lilt/).
 
-Diese Mac-App adaptiert die HTML-Struktur, SVG-Symbole, Gestaltung und Animationskurven der Studie. Die native Mac-Integration, echte Player-Steuerung, der unabhängige Fokus-Timer, Einstellungen und Dateiablage erweitern sie. Die Gestaltung der Vorlage wird nicht als eigene Arbeit ausgegeben.
+This Mac app adapts the study's HTML structure, SVG icons, design and animation curves. It extends the study with native Mac integration, player controls, an independent focus timer, settings and a file shelf. The original design is credited to its creator.
 
-Der Projektinhaber hat am 31. Oktober 2026 bestätigt, von Vayun Godara die Erlaubnis zur Open-Source-Veröffentlichung dieser Adaption erhalten zu haben. Die Implementierung und die hier veröffentlichten Anpassungen stehen unter der [MIT-Lizenz](LICENSE). Diese Angabe erklärt weder die gesamte ursprüngliche Website noch andere Arbeiten von Vayun Godara pauschal zu MIT-lizenzierten Werken.
+On October 31, 2026, the project owner confirmed that Vayun Godara had granted permission to publish this adaptation as open source. The implementation and adaptations published here are available under the [MIT licence](LICENSE). That does not make the entire original website or Vayun Godara's other work MIT licensed.
 
 ## Familjen Grotesk
 
-- Datei: `Resources/Web/familjen-grotesk.woff2`, Version 2.002, variable Gewichtung 400–700.
+- File: `Resources/Web/familjen-grotesk.woff2`, version 2.002, variable weights 400–700.
 - Copyright 2021 The Familjen Grotesk Project Authors.
-- Projekt: [Familjen-Sthlm/Familjen-Grotesk](https://github.com/Familjen-Sthlm/Familjen-Grotesk).
-- Lizenz: **SIL Open Font License 1.1**, vollständig in [Resources/Licenses/Familjen-Grotesk-OFL.txt](Resources/Licenses/Familjen-Grotesk-OFL.txt).
+- Project: [Familjen-Sthlm/Familjen-Grotesk](https://github.com/Familjen-Sthlm/Familjen-Grotesk).
+- Licence: **SIL Open Font License 1.1**, included in full at [Resources/Licenses/Familjen-Grotesk-OFL.txt](Resources/Licenses/Familjen-Grotesk-OFL.txt).
 
-Die gebündelte Datei stammt aus der Lilt-Studie. Ihr eingebetteter Familienname, Versionsstand und Copyright-Hinweis wurden vor der Veröffentlichung mit dem Schriftprojekt abgeglichen. Die Schrift wurde für diese Veröffentlichung nicht verändert und bleibt unter OFL-1.1; die MIT-Lizenz des Anwendungscodes ersetzt ihre Lizenz nicht.
+The bundled font came from the Lilt study. Its embedded family name, version and copyright notice were checked against the font project before publication. The font was not modified for this release and remains under OFL 1.1; the app code's MIT licence does not replace the font licence.
 
-## Externe Musikdienste und Programme
+## External services and software
 
-Spotify, Apple Music, Brain.fm und Meld sind externe Dienste beziehungsweise Programme ihrer jeweiligen Anbieter. Lilt wird von ihnen nicht als offizielles Produkt herausgegeben. Ihre Apps, Musik, Kontodaten und zur Laufzeit gelesenen Albumcover sind nicht Bestandteil der MIT-Lizenz dieses Repositorys. Es werden keine Anbieter-Apps oder Musikdateien mitgeliefert.
+Spotify, Apple Music, Brain.fm and Meld are third-party services or applications provided by their respective owners. Lilt is not an official product of those providers. Their apps, music, account data and album art read at runtime are not covered by this repository's MIT licence. Provider apps and music files are not bundled.
 
-## App-Bundle
+## App bundle
 
-Das Build-Skript legt die Projektlizenz, diese Hinweise und die Schriftlizenz unter `Lilt.app/Contents/Resources/Licenses/` ab. Diese Dateien bei Weitergabe der App beibehalten.
+The build script includes the project licence, these notices and the font licence in `Lilt.app/Contents/Resources/Licenses/`. Retain these files when distributing the app.

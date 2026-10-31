@@ -1,5 +1,6 @@
 import { VIEWS, clock, elapsedAt, freshMusic, musicSnapshot, musicAction } from './model.mjs';
 import { freshFocus, focusSnapshot, focusLocked, focusAction } from './focus-state.mjs';
+import { selectShelfItem } from './shelf-selection.mjs';
 
 const root = document.documentElement;
 const notch = document.querySelector('#notch');
@@ -16,9 +17,13 @@ const state = {
   settings: { musicSource: 'meld', sourceName: 'Meld', brainFMEnabled: true },
   shelf: [], shelfMessage: null,
 };
-const focusMenu = { kind: null, custom: false };
+const shelfSelection = { selected: new Set(), anchor: null };
+const focusMenu = { kind: null, custom: false, intervals: false };
 const menuAnimations = new WeakMap();
 const reduced = () => reducedMotion.matches || root.classList.contains('reduce-motion');
+reducedMotion.addEventListener('change', () => {
+  if (reduced()) clearSwipeMotion();
+});
 const native = message => window.webkit?.messageHandlers?.lilt?.postMessage(message);
 const each = (name, apply) => document.querySelectorAll(`[data-live="${name}"]`).forEach(apply);
 const text = (name, value) => each(name, element => { if (element.textContent !== value) element.textContent = value; });
@@ -48,7 +53,9 @@ function renderWings() {
       if (wing.dataset.key === key) continue;
       wing.innerHTML = '<span class="wave"><i></i><i></i><i></i><i></i><i></i></span>';
     } else {
-      wing.textContent = view === 'music' ? music.availability === 'ready' ? clock(elapsed()) : sourceName() : view === 'focus' ? state.focus.error ? '!' : state.focus.phase === 'completed' ? 'Done' : clock(remaining()) : shelf.length ? String(shelf.length) : '';
+      let label = wing.querySelector('.wing-label');
+      if (!label) { label = document.createElement('span'); label.className = 'wing-label'; wing.replaceChildren(label); }
+      label.textContent = view === 'music' ? music.availability === 'ready' ? clock(elapsed()) : sourceName() : view === 'focus' ? state.focus.error ? '!' : state.focus.phase === 'completed' ? 'Done' : `${state.focus.interval?.phase === 'rest' ? 'B ' : ''}${clock(remaining())}` : shelf.length ? String(shelf.length) : '';
     }
     wing.dataset.key = key;
   }
@@ -91,8 +98,8 @@ function render() {
   text('focus', clock(left));
   const pending = state.focus.pending;
   const error = state.focus.error;
-  const withMusic = brainFMEnabled();
-  const focusNote = state.focus.restoring ? withMusic ? 'Checking Brain.fm…' : 'Restoring timer…' : pending ? withMusic ? pending.action === 'start' ? 'Starting Brain.fm…' : 'Pausing Brain.fm…' : 'Updating timer…' : error ? error.code === 'permission' ? 'Allow Lilt in Accessibility.' : error.message : '';
+  const withMusic = brainFMEnabled() && state.focus.interval?.phase !== 'rest';
+  const focusNote = state.focus.restoring ? withMusic ? 'Checking Brain.fm…' : 'Restoring timer…' : pending ? withMusic ? pending.action === 'start' ? 'Starting Brain.fm…' : 'Pausing Brain.fm…' : 'Updating timer…' : error ? error.code === 'permission' ? 'Allow Lilt in Accessibility.' : error.message : state.focus.interval?.state === 'awaitingNext' ? state.focus.interval.phase === 'work' ? 'Next: Break' : 'Next: Work' : '';
   text('focus-note', focusNote);
   document.querySelector('.focus-note').hidden = !focusNote;
   document.querySelector('.focus-note').title = error?.message || '';
@@ -101,9 +108,9 @@ function render() {
   document.querySelector('[data-action="brainfm-open"]').hidden = !withMusic || !error || error.code === 'permission';
   const minutes = state.focus.duration / 60;
   const durationLabel = `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
-  text('focus-activity', state.focus.activity === 'lightWork' ? 'Light Work' : 'Deep Work');
+  text('focus-activity', state.focus.interval?.phase === 'rest' ? 'Break' : state.focus.activity === 'lightWork' ? 'Light Work' : 'Deep Work');
   document.querySelector('#focus-duration').setAttribute('aria-label', `Focus duration, ${durationLabel}. ${clock(left)} remaining.`);
-  document.querySelector('#focus-activity').setAttribute('aria-label', `Focus activity, ${state.focus.activity === 'lightWork' ? 'Light Work' : 'Deep Work'}`);
+  document.querySelector('#focus-activity').setAttribute('aria-label', state.focus.interval?.phase === 'rest' ? 'Break' : `Focus activity, ${state.focus.activity === 'lightWork' ? 'Light Work' : 'Deep Work'}`);
   document.querySelector('#focus-activity-menu').setAttribute('aria-label', 'Focus activity');
   renderFocusMenu();
   const play = document.querySelector('[data-action="play"]');
@@ -120,7 +127,9 @@ function render() {
   focus.disabled = Boolean(pending) || !state.focus.ready || state.focus.restoring;
   focus.setAttribute('aria-busy', String(Boolean(pending)));
   focus.setAttribute('aria-label', pending ? withMusic ? 'Waiting for Brain.fm' : 'Updating focus timer' : error ? withMusic ? 'Retry Brain.fm control' : 'Retry focus timer' : running ? withMusic ? 'Pause focus and Brain.fm' : 'Pause focus timer' : withMusic ? 'Start focus and Brain.fm' : 'Start focus timer');
+  if (state.focus.interval?.state === 'awaitingNext') focus.setAttribute('aria-label', state.focus.interval.phase === 'work' ? 'Start break' : 'Start work');
   focus.title = pending ? withMusic ? 'Waiting for Brain.fm' : 'Updating timer' : running ? withMusic ? 'Pause timer and Brain.fm' : 'Pause timer' : withMusic ? 'Start Brain.fm in the background' : 'Start timer';
+  if (state.focus.interval?.state === 'awaitingNext') focus.title = state.focus.interval.phase === 'work' ? 'Start break' : 'Start work';
   document.querySelector('[data-action="focus-reset"]').disabled = Boolean(pending) || !state.focus.ready || state.focus.restoring;
   document.querySelector('[data-action="focus-reset"]').setAttribute('aria-label', `Reset the focus timer to ${durationLabel}`);
   root.classList.toggle('music-playing', state.music.playing);
@@ -128,33 +137,79 @@ function render() {
   renderWings();
 }
 
+function shelfSelect(id, event = {}) {
+  const result = selectShelfItem(state.shelf.map(file => file.id), shelfSelection.selected, shelfSelection.anchor, id, {
+    toggle: Boolean(event.metaKey || event.ctrlKey), range: Boolean(event.shiftKey),
+  });
+  shelfSelection.selected = result.selected;
+  shelfSelection.anchor = result.anchor;
+  updateShelfSelection();
+}
+
+function updateShelfSelection() {
+  document.querySelectorAll('.file-main').forEach(main => {
+    const selected = shelfSelection.selected.has(main.dataset.fileID);
+    main.setAttribute('aria-pressed', String(selected));
+    main.closest('li').classList.toggle('is-selected', selected);
+  });
+}
+
+function shelfIDs() {
+  return state.shelf.filter(file => shelfSelection.selected.has(file.id)).map(file => file.id);
+}
+
 function renderShelf() {
   const list = document.querySelector('[data-live="files"]');
-  const scroll = list.scrollLeft;
+  const scroll = list.scrollTop;
   const focused = document.activeElement?.dataset.fileID;
-  const items = state.shelf.map(file => {
+  const items = state.shelf.map((file, index) => {
     const item = document.createElement('li');
     item.classList.toggle('is-missing', !file.available);
+    item.classList.toggle('is-selected', shelfSelection.selected.has(file.id));
     const main = document.createElement('button');
     main.type = 'button';
     main.className = 'file-main';
     main.draggable = file.available;
     main.dataset.fileID = file.id;
-    main.setAttribute('aria-label', `${file.available ? 'Preview' : 'Unavailable file'}: ${file.name}, ${file.location}`);
+    main.setAttribute('aria-pressed', String(shelfSelection.selected.has(file.id)));
+    main.setAttribute('aria-label', `${file.name}, ${file.available ? file.location : 'File unavailable'}${file.retention === 'long' ? ', kept longer' : ''}`);
     main.title = `${file.name} · ${file.location}${file.available ? '' : ' · File unavailable'}`;
-    main.innerHTML = '<svg aria-hidden="true"><use href="#i-file"/></svg><span><strong></strong><small></small></span>';
+    main.innerHTML = '<span class="file-icon"><svg aria-hidden="true"><use href="#i-file"/></svg></span><span class="file-details"><strong></strong><small></small></span>';
+    const thumbnail = typeof file.thumbnail === 'string' && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(file.thumbnail) && file.thumbnail.length <= 200000 ? file.thumbnail : null;
+    if (thumbnail) {
+      const image = document.createElement('img'); image.alt = ''; image.src = thumbnail;
+      main.querySelector('.file-icon').replaceChildren(image);
+    }
     main.querySelector('strong').textContent = file.name;
-    main.querySelector('small').textContent = file.available ? file.location : 'File unavailable';
-    main.addEventListener('click', () => shelfCommand('preview', file.id));
+    main.querySelector('small').textContent = file.available ? `${file.location}${file.retention === 'long' ? ' · Kept longer' : ''}` : 'File unavailable';
+    main.addEventListener('click', event => { if (event.detail < 2) shelfSelect(file.id, event); });
     main.addEventListener('dblclick', () => shelfCommand('open', file.id));
     main.addEventListener('dragstart', event => {
       event.preventDefault();
+      if (!shelfSelection.selected.has(file.id)) {
+        const result = selectShelfItem(state.shelf.map(entry => entry.id), shelfSelection.selected, shelfSelection.anchor, file.id);
+        shelfSelection.selected = result.selected; shelfSelection.anchor = result.anchor;
+      }
       const rect = main.getBoundingClientRect();
-      shelfCommand('drag', file.id, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+      shelfCommand('drag', file.id, { ids: shelfIDs(), x: rect.x, y: rect.y, width: rect.width, height: rect.height });
     });
     main.addEventListener('keydown', event => {
-      if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); shelfCommand('preview', file.id); }
-      if (event.key === 'Backspace' || event.key === 'Delete') { event.preventDefault(); shelfCommand('remove', file.id); }
+      if (event.key === ' ' || event.key === 'Enter') {
+        event.preventDefault();
+        if (event.key === ' ' && !event.metaKey && !event.shiftKey) shelfCommand('preview', file.id);
+        else if (event.key === 'Enter' && !event.metaKey && !event.shiftKey) shelfCommand('open', file.id);
+        else shelfSelect(file.id, event);
+      }
+      if (event.key === 'Backspace' || event.key === 'Delete') {
+        event.preventDefault();
+        const ids = shelfSelection.selected.has(file.id) ? shelfIDs() : [file.id];
+        shelfCommand('remove', file.id, { ids });
+      }
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const next = state.shelf[Math.max(0, Math.min(state.shelf.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))];
+        if (next) { shelfSelect(next.id, event); list.querySelectorAll('.file-main')[state.shelf.indexOf(next)]?.focus(); }
+      }
     });
     const menu = document.createElement('button');
     menu.type = 'button';
@@ -163,8 +218,13 @@ function renderShelf() {
     menu.setAttribute('aria-label', `Actions for ${file.name}`);
     const openMenu = event => {
       event.preventDefault();
+      if (!shelfSelection.selected.has(file.id)) {
+        const result = selectShelfItem(state.shelf.map(entry => entry.id), shelfSelection.selected, shelfSelection.anchor, file.id);
+        shelfSelection.selected = result.selected; shelfSelection.anchor = result.anchor;
+      }
       const rect = menu.getBoundingClientRect();
-      shelfCommand('menu', file.id, { x: rect.x, y: rect.bottom });
+      shelfCommand('menu', file.id, { ids: shelfIDs(), x: rect.x, y: rect.bottom });
+      updateShelfSelection();
     };
     menu.addEventListener('click', openMenu);
     item.addEventListener('contextmenu', openMenu);
@@ -172,13 +232,13 @@ function renderShelf() {
     return item;
   });
   list.replaceChildren(...items);
-  list.scrollLeft = scroll;
+  list.scrollTop = scroll;
   list.hidden = !items.length;
   document.querySelector('.drop').hidden = Boolean(items.length);
   document.querySelector('.shelf-actions').hidden = !items.length;
   document.querySelector('[data-live="shelf-note"]').textContent = state.shelfMessage || '';
   document.querySelector('.shelf-note').hidden = !state.shelfMessage;
-  if (focused) [...list.querySelectorAll('.file-main')].find(element => element.dataset.fileID === focused)?.focus();
+  if (focused) [...list.querySelectorAll('.file-main')].find(element => element.dataset.fileID === focused)?.focus({ preventScroll: true });
   render();
 }
 
@@ -189,12 +249,101 @@ function shelfCommand(command, id, extra = {}) {
 function receiveShelfSnapshot(value) {
   if (!value || !Array.isArray(value.items)) return;
   state.shelf = value.items.filter(file => file && typeof file.id === 'string' && typeof file.name === 'string' && typeof file.location === 'string' && typeof file.available === 'boolean');
+  const ids = new Set(state.shelf.map(file => file.id));
+  shelfSelection.selected = new Set([...shelfSelection.selected].filter(id => ids.has(id)));
+  if (!ids.has(shelfSelection.anchor)) shelfSelection.anchor = null;
   state.shelfMessage = typeof value.message === 'string' ? value.message : null;
   renderShelf();
 }
 
-function setView(view, { focus = false, animate = true } = {}) {
+let gesture = null;
+// A single strip position keeps all pages physically attached during a swipe.
+let swipeMotion = null;
+
+function clearSwipeMotion() {
+  gesture = null;
+  if (!swipeMotion) return;
+  cancelAnimationFrame(swipeMotion.frame);
+  swipeMotion = null;
+  notch.classList.remove('swiping');
+  // Removing inline positions must not trigger the ordinary tab fade/scale again.
+  notch.classList.add('instant-view');
+  notch.style.setProperty('--tab-index', VIEWS.indexOf(state.view));
+  viewPanels.forEach(view => {
+    for (const property of ['transform', 'opacity', 'visibility', 'transition', 'will-change']) view.style.removeProperty(property);
+  });
+  void panel.offsetWidth;
+  notch.classList.remove('instant-view');
+}
+
+function paintSwipe() {
+  const motion = swipeMotion;
+  if (!motion) return;
+  notch.style.setProperty('--tab-index', Math.max(0, Math.min(VIEWS.length - 1, motion.position / motion.width)));
+  viewPanels.forEach((view, index) => {
+    view.style.transform = `translate3d(${index * motion.width - motion.position}px,0,0)`;
+  });
+}
+
+function scheduleSwipePaint() {
+  const motion = swipeMotion;
+  if (motion.frame) return;
+  motion.frame = requestAnimationFrame(() => {
+    if (swipeMotion !== motion) return;
+    motion.frame = 0;
+    paintSwipe();
+  });
+}
+
+function beginSwipeMotion(index) {
+  if (swipeMotion) {
+    return;
+  }
+  const current = viewPanels[index];
+  const width = Math.max(1, current.offsetWidth);
+  const renderedWidth = Math.max(1, current.getBoundingClientRect().width);
+  swipeMotion = { width, scale: width / renderedWidth, position: index * width, velocity: 0, frame: 0, time: performance.now() };
+  notch.classList.add('swiping');
+  viewPanels.forEach(view => {
+    view.style.transition = 'none';
+    view.style.visibility = 'visible';
+    view.style.opacity = '1';
+    view.style.willChange = 'transform';
+  });
+  paintSwipe();
+}
+
+function settleSwipe(index) {
+  const motion = swipeMotion;
+  const target = index * motion.width;
+  // Critically damped spring: no bounce, and new gestures take over its live position.
+  cancelAnimationFrame(motion.frame);
+  motion.frame = 0;
+  const omega = 32;
+  const distance = target - motion.position;
+  const direction = Math.sign(distance);
+  motion.velocity = direction * Math.max(-motion.width * 5,
+    Math.min(direction * motion.velocity, Math.abs(distance) * omega));
+  motion.time = performance.now();
+  const step = now => {
+    if (swipeMotion !== motion) return;
+    const dt = Math.min((now - motion.time) / 1000, .05);
+    motion.time = now;
+    const displacement = motion.position - target;
+    const coefficient = motion.velocity + omega * displacement;
+    const decay = Math.exp(-omega * dt);
+    motion.position = target + (displacement + coefficient * dt) * decay;
+    motion.velocity = (motion.velocity - omega * coefficient * dt) * decay;
+    paintSwipe();
+    if (Math.abs(motion.position - target) < .5 && Math.abs(motion.velocity) < 15) clearSwipeMotion();
+    else motion.frame = requestAnimationFrame(step);
+  };
+  motion.frame = requestAnimationFrame(step);
+}
+
+function setView(view, { focus = false, animate = true, preserveSwipe = false } = {}) {
   if (!VIEWS.includes(view)) return;
+  if (!preserveSwipe) clearSwipeMotion();
   closeFocusMenu({ animate: false });
   const index = VIEWS.indexOf(view);
   const instant = !animate || reduced() || !state.open;
@@ -223,7 +372,80 @@ function setView(view, { focus = false, animate = true } = {}) {
   render();
 }
 
+function canSwipeAt(x, y) {
+  if (!state.open || !Number.isFinite(x) || !Number.isFinite(y) ||
+      notch.classList.contains('dragging') || focusMenu.kind) return false;
+  const target = document.elementFromPoint(x, y);
+  if (!target || !panel.contains(target) || target.closest('.focus-menu, input, textarea, select, [contenteditable="true"]')) return false;
+  for (let node = target; node && node !== panel; node = node.parentElement) {
+    const style = getComputedStyle(node);
+    if (/(auto|scroll)/.test(style.overflowX) && node.scrollWidth > node.clientWidth) return false;
+  }
+  return true;
+}
+
+function swipeTab(direction, x, y) {
+  if (![-1, 1].includes(direction) || !canSwipeAt(x, y)) return false;
+  const next = Math.max(0, Math.min(VIEWS.length - 1, VIEWS.indexOf(state.view) + direction));
+  if (VIEWS[next] === state.view) return false;
+  setView(VIEWS[next]);
+  return true;
+}
+
+function swipeGesture(phase, dx, dy, accepted, x, y, inputTime = performance.now() / 1000) {
+  if (phase === 'begin') {
+    if (!canSwipeAt(x, y)) { clearSwipeMotion(); return; }
+    const index = VIEWS.indexOf(state.view);
+    if (swipeMotion) {
+      cancelAnimationFrame(swipeMotion.frame);
+      swipeMotion.frame = 0;
+    }
+    gesture = { x: 0, y: 0, axis: null, index, origin: swipeMotion?.position ?? null };
+  }
+  if (!gesture || !state.open || !Number.isFinite(dx) || !Number.isFinite(dy)) return;
+  if (phase === 'begin' || phase === 'change') {
+    gesture.x += dx;
+    gesture.y += dy;
+    if (!gesture.axis) {
+      if (Math.abs(gesture.y) >= 10 && Math.abs(gesture.y) >= Math.abs(gesture.x)) gesture.axis = 'vertical';
+      else if (Math.abs(gesture.x) >= 10 && Math.abs(gesture.x) >= Math.abs(gesture.y) * 1.6) gesture.axis = 'horizontal';
+    }
+    if (gesture.axis !== 'horizontal' || reduced()) return;
+    beginSwipeMotion(gesture.index);
+    if (gesture.origin === null) gesture.origin = gesture.index * swipeMotion.width;
+    const now = Number.isFinite(inputTime) ? inputTime : performance.now() / 1000;
+    const previous = swipeMotion.position;
+    const proposed = gesture.origin - gesture.x * swipeMotion.scale;
+    const lower = Math.max(0, gesture.index - 1) * swipeMotion.width;
+    const upper = Math.min(VIEWS.length - 1, gesture.index + 1) * swipeMotion.width;
+    // At the outside edges, resistance makes the boundary tangible without wrapping.
+    const bound = Math.max(lower, Math.min(upper, proposed));
+    const overflow = proposed - bound;
+    swipeMotion.position = bound + Math.sign(overflow) * 36 * (1 - Math.exp(-Math.abs(overflow) / 120));
+    const dt = swipeMotion.inputTime === undefined ? 0 : now - swipeMotion.inputTime;
+    if (dt > 0 && dt < .1) {
+      const weight = 1 - Math.exp(-dt / .035);
+      swipeMotion.velocity += weight * ((swipeMotion.position - previous) / dt - swipeMotion.velocity);
+    } else swipeMotion.velocity = 0;
+    swipeMotion.inputTime = now;
+    scheduleSwipePaint();
+    return;
+  }
+  if (phase !== 'end' && phase !== 'cancel') return;
+  const direction = gesture.x < 0 ? 1 : -1;
+  const next = gesture.index + direction;
+  const commit = phase === 'end' && gesture.axis === 'horizontal' && accepted === direction &&
+    Math.abs(gesture.x) >= 40 && next >= 0 && next < VIEWS.length;
+  const index = commit ? next : gesture.index;
+  gesture = null;
+  if (commit) setView(VIEWS[index], { animate: false, preserveSwipe: true });
+  if (reduced() || !swipeMotion) { clearSwipeMotion(); return; }
+  if (Number.isFinite(inputTime) && inputTime - swipeMotion.inputTime > .08) swipeMotion.velocity = 0;
+  settleSwipe(index);
+}
+
 function setOpen(open, { focus = false } = {}) {
+  if (!open) clearSwipeMotion();
   if (!open) closeFocusMenu({ animate: false });
   if (state.open === open) return;
   state.open = Boolean(open);
@@ -274,7 +496,7 @@ function receiveFocusSnapshot(value) {
   state.focus = snapshot;
   render();
   if (snapshot.error && snapshot.error.message !== before.error?.message) announce(snapshot.error.message);
-  else if (snapshot.phase === 'completed' && before.phase !== 'completed') announce(brainFMEnabled() ? 'Focus session complete. Brain.fm paused.' : 'Focus session complete.');
+  else if (snapshot.phase === 'completed' && before.phase !== 'completed') announce(snapshot.interval ? `${snapshot.interval.phase === 'work' ? 'Work' : 'Break'} complete. Start the next phase when ready.` : brainFMEnabled() ? 'Focus session complete. Brain.fm paused.' : 'Focus session complete.');
 }
 
 function receiveSettingsSnapshot(value) {
@@ -289,12 +511,12 @@ function controlFocus(command) {
   native({ action: 'focusAction', command });
 }
 
-function configureFocus({ activity = state.focus.activity, minutes = state.focus.duration / 60 } = {}, { animate = false } = {}) {
+function configureFocus({ activity = state.focus.activity, minutes = state.focus.duration / 60 } = {}, { animate = false, activityOnly = false } = {}) {
   if (focusLocked(state.focus)) return false;
   const custom = document.querySelector('#focus-minutes');
   if (!Number.isInteger(minutes) || minutes < 1 || minutes > 180) { custom.setCustomValidity('Choose 1–180 minutes.'); custom.reportValidity(); return false; }
   custom.setCustomValidity('');
-  if (activity !== state.focus.activity || minutes !== state.focus.duration / 60) native({ action: 'focusConfigure', activity, minutes });
+  if ((!activityOnly && state.focus.interval) || activity !== state.focus.activity || minutes !== state.focus.duration / 60) native({ action: 'focusConfigure', activity, minutes });
   closeFocusMenu({ restoreFocus: true, animate });
   return true;
 }
@@ -354,6 +576,8 @@ function renderFocusMenu() {
   for (const option of document.querySelectorAll('#focus-duration-menu [data-minutes]')) option.setAttribute('aria-checked', String(option.dataset.minutes === ([25, 50].includes(minutes) ? String(minutes) : 'custom')));
   if (focusMenu.kind === 'duration') {
     document.querySelector('#focus-config').hidden = !focusMenu.custom;
+    document.querySelector('#focus-interval-config').hidden = !focusMenu.intervals;
+    document.querySelector('#focus-duration-menu [role="menu"]').hidden = focusMenu.intervals;
     document.querySelector('[data-action="focus-custom"]').hidden = focusMenu.custom;
   }
   const input = document.querySelector('#focus-minutes');
@@ -378,6 +602,7 @@ function openFocusMenu(kind, { last = false, animate = false } = {}) {
   if (focusMenu.kind) closeFocusMenu({ animate: false });
   focusMenu.kind = kind;
   focusMenu.custom = false;
+  focusMenu.intervals = false;
   const input = document.querySelector('#focus-minutes');
   input.value = state.focus.duration / 60;
   input.setCustomValidity('');
@@ -395,7 +620,7 @@ function openFocusMenu(kind, { last = false, animate = false } = {}) {
 const actions = {
   'focus-menu'(event) { openFocusMenu(event.target.closest('[data-menu]').dataset.menu, { animate: event.detail > 0 }); },
   'focus-activity'(event) {
-    configureFocus({ activity: event.target.closest('[data-activity]').dataset.activity }, { animate: event.detail > 0 });
+    configureFocus({ activity: event.target.closest('[data-activity]').dataset.activity }, { animate: event.detail > 0, activityOnly: true });
   },
   'focus-duration'(event) {
     configureFocus({ minutes: Number(event.target.closest('[data-minutes]').dataset.minutes) }, { animate: event.detail > 0 });
@@ -406,13 +631,22 @@ const actions = {
     const input = document.querySelector('#focus-minutes');
     input.focus(); input.select();
   },
+  'focus-intervals'() {
+    focusMenu.intervals = true;
+    renderFocusMenu();
+    const input = document.querySelector('#focus-work-minutes');
+    input.value = state.focus.interval?.workMinutes || state.focus.duration / 60;
+    document.querySelector('#focus-rest-minutes').value = state.focus.interval?.restMinutes || 5;
+    input.focus(); input.select();
+  },
   play: () => controlMusic(musicAction(state.music)),
   prev: () => controlMusic('previous'),
   next: () => controlMusic('next'),
   'meld-open': () => native({ action: (state.music.source || state.settings.musicSource) === 'meld' ? 'meldOpen' : 'musicOpen' }),
   settings: () => native({ action: 'settingsOpen' }),
   focus() {
-    controlFocus(focusAction(state.focus));
+    if (state.focus.interval?.state === 'awaitingNext') native({ action: 'focusIntervalsNext' });
+    else controlFocus(focusAction(state.focus));
   },
   'focus-reset': () => controlFocus('reset'),
   'brainfm-settings': () => native({ action: 'brainfmSettings' }),
@@ -464,6 +698,13 @@ document.querySelectorAll('.focus-menu').forEach(menu => {
   });
   menu.addEventListener('keydown', event => {
     if (event.key === 'Tab') {
+      if (focusMenu.intervals) {
+        const controls = [...document.querySelectorAll('#focus-interval-config input, #focus-interval-config button')];
+        const index = controls.indexOf(event.target);
+        if ((!event.shiftKey && index < controls.length - 1) || (event.shiftKey && index > 0)) {
+          event.preventDefault(); controls[index + (event.shiftKey ? -1 : 1)].focus(); return;
+        }
+      }
       if (focusMenu.custom) {
         const input = document.querySelector('#focus-minutes');
         const submit = document.querySelector('#focus-config button');
@@ -493,21 +734,37 @@ document.querySelector('#focus-config').addEventListener('submit', event => {
   configureFocus({ minutes: Number(document.querySelector('#focus-minutes').value) }, { animate: customSubmitByPointer });
   customSubmitByPointer = false;
 });
+document.querySelector('#focus-interval-config').addEventListener('submit', event => {
+  event.preventDefault();
+  if (focusLocked(state.focus) || !event.target.reportValidity()) return;
+  native({ action: 'focusIntervalsConfigure', workMinutes: Number(document.querySelector('#focus-work-minutes').value), restMinutes: Number(document.querySelector('#focus-rest-minutes').value) });
+  closeFocusMenu({ restoreFocus: true });
+});
 
 window.Lilt = Object.freeze({
-  configure({ hardwareWidth, hardwareHeight, reducedMotion: reduce } = {}) {
-    if (Number.isFinite(hardwareWidth)) root.style.setProperty('--hardware-width', `${Math.max(0, Math.min(300, hardwareWidth))}px`);
-    if (Number.isFinite(hardwareHeight)) root.style.setProperty('--hardware-height', `${Math.max(24, Math.min(64, hardwareHeight))}px`);
+  configure({ hardwareWidth, hardwareHeight, hideHardwareWings, hideNotchContent, reducedMotion: reduce } = {}) {
+    if (Number.isFinite(hardwareWidth)) root.style.setProperty('--hardware-width', `${Math.max(0, Math.min(500, hardwareWidth))}px`);
+    if (typeof hideHardwareWings === 'boolean') notch.classList.toggle('hardware-unknown', hideHardwareWings);
+    if (typeof hideNotchContent === 'boolean') notch.classList.toggle('hardware-height-unknown', hideNotchContent);
+    if (Number.isFinite(hardwareHeight)) root.style.setProperty('--hardware-height', `${Math.max(24, Math.min(100, hardwareHeight))}px`);
     if (typeof reduce === 'boolean') root.classList.toggle('reduce-motion', reduce);
-    if (reduced()) document.getAnimations().forEach(animation => animation.cancel());
+    if (reduced()) {
+      clearSwipeMotion();
+      document.getAnimations().forEach(animation => animation.cancel());
+    }
   },
   setOpen,
   setView,
+  swipeTab,
+  swipeGesture,
   receiveShelfSnapshot,
   receiveFocusSnapshot,
   receiveMusicSnapshot,
   receiveSettingsSnapshot,
-  setDragging: dragging => notch.classList.toggle('dragging', Boolean(dragging)),
+  setDragging(dragging) {
+    if (dragging) clearSwipeMotion();
+    notch.classList.toggle('dragging', Boolean(dragging));
+  },
   inspect: () => structuredClone({ ...state, errors, elapsed: elapsed(), remaining: remaining() }),
 });
 panel.inert = true;

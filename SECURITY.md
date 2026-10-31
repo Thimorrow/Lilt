@@ -1,7 +1,7 @@
-# Sicherheitsprobleme melden
+# Security
 
-Bitte Sicherheitslücken über [GitHubs vertrauliche Sicherheitsmeldung](https://github.com/Thimorrow/Lilt/security/advisories/new) melden. Keine Zugangsdaten, privaten Dateien oder ausnutzbaren Details in öffentlichen Issues veröffentlichen.
+Please report vulnerabilities using [GitHub's private vulnerability reporting](https://github.com/Thimorrow/Lilt/security/advisories/new). Do not post credentials, private files or exploitable details in public issues.
 
-Hilfreich sind betroffener Commit, macOS-Version, eine nachvollziehbare Beschreibung und eine möglichst kleine Reproduktion mit Testdaten. Persönliche Inhalte vor dem Teilen entfernen.
+Include the affected commit, macOS version, a description and a minimal reproduction using test data. Remove personal information before sharing it.
 
-Lilt ist ein frühes Projekt. Sicherheitskorrekturen richten sich zunächst an den aktuellen `main`-Stand; es gibt noch keine gesondert gepflegten Release-Reihen oder zugesicherte Reaktionsfrist.
+Lilt is an early project. Security fixes initially target the current `main` branch; there are no separately maintained release lines or guaranteed response times.

@@ -6,17 +6,25 @@ struct LiltSettings: Codable, Equatable {
     var brainFMEnabled = false
     var focusMinutes = 25
     var focusActivity: FocusActivity = .deepWork
+    var shelfShortDays = 7
+    var shelfLongDays = 30
+    var displayID = ""
 
     var payload: [String: Any] {
         ["musicSource": musicSource.rawValue, "sourceName": musicSource.title,
          "brainFMEnabled": brainFMEnabled, "focusMinutes": focusMinutes,
-         "focusActivity": focusActivity.rawValue]
+         "focusActivity": focusActivity.rawValue, "shelfShortDays": shelfShortDays,
+         "shelfLongDays": shelfLongDays, "displayID": displayID]
     }
 
     func applying(_ changes: [String: Any]) throws -> Self {
-        let allowed: Set<String> = ["musicSource", "brainFMEnabled", "focusMinutes", "focusActivity"]
+        let allowed: Set<String> = ["musicSource", "brainFMEnabled", "focusMinutes", "focusActivity", "shelfShortDays", "shelfLongDays", "displayID"]
         guard !changes.isEmpty, Set(changes.keys).isSubset(of: allowed) else { throw SettingsError.invalid }
         var result = self
+        if let value = changes["displayID"] {
+            guard let id = value as? String, id.isEmpty || UUID(uuidString: id) != nil else { throw SettingsError.invalid }
+            result.displayID = id
+        }
         if let value = changes["musicSource"] {
             guard let raw = value as? String, let source = MusicSource(rawValue: raw) else { throw SettingsError.invalid }
             result.musicSource = source
@@ -35,14 +43,36 @@ struct LiltSettings: Codable, Equatable {
             guard let raw = value as? String, let activity = FocusActivity(rawValue: raw) else { throw SettingsError.invalid }
             result.focusActivity = activity
         }
+        for key in ["shelfShortDays", "shelfLongDays"] {
+            if let value = changes[key] {
+                guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+                      number.doubleValue.isFinite, number.doubleValue.rounded() == number.doubleValue,
+                      (1...3650).contains(number.doubleValue) else { throw SettingsError.invalid }
+                if key == "shelfShortDays" { result.shelfShortDays = number.intValue }
+                else { result.shelfLongDays = number.intValue }
+            }
+        }
         return result
+    }
+}
+
+extension LiltSettings {
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        musicSource = try container.decode(MusicSource.self, forKey: .musicSource)
+        brainFMEnabled = try container.decode(Bool.self, forKey: .brainFMEnabled)
+        focusMinutes = try container.decode(Int.self, forKey: .focusMinutes)
+        focusActivity = try container.decode(FocusActivity.self, forKey: .focusActivity)
+        shelfShortDays = try container.decodeIfPresent(Int.self, forKey: .shelfShortDays) ?? 7
+        shelfLongDays = try container.decodeIfPresent(Int.self, forKey: .shelfLongDays) ?? 30
+        displayID = try container.decodeIfPresent(String.self, forKey: .displayID) ?? ""
     }
 }
 
 struct SettingsError: Error, Equatable {
     let code: String
     let message: String
-    static let invalid = Self(code: "invalid", message: "Choose a music source, a focus activity and a duration from 1 to 180 minutes.")
+    static let invalid = Self(code: "invalid", message: "Choose valid settings. Focus duration must be 1 to 180 minutes and Shelf duration 1 to 3650 days.")
     static let storage = Self(code: "storage", message: "Settings could not be saved. Check your disk space and try again.")
     static let musicBusy = Self(code: "music_busy", message: "Wait for the current player command to finish before switching sources.")
     static let focusBusy = Self(code: "focus_busy", message: "End or reset your focus session before changing its defaults or Brain.fm connection.")
@@ -67,7 +97,8 @@ final class SettingsStore {
         guard FileManager.default.fileExists(atPath: file.path) else { return }
         do {
             let saved = try JSONDecoder().decode(LiltSettings.self, from: Data(contentsOf: file))
-            guard (1...180).contains(saved.focusMinutes) else { throw SettingsError.invalid }
+            guard (1...180).contains(saved.focusMinutes), (1...3650).contains(saved.shelfShortDays),
+                  (1...3650).contains(saved.shelfLongDays), saved.displayID.isEmpty || UUID(uuidString: saved.displayID) != nil else { throw SettingsError.invalid }
             value = saved
         } catch {
             self.error = SettingsError(code: "settings_read", message: "Saved settings could not be read. Choose your settings again to save a new configuration.")
@@ -76,7 +107,8 @@ final class SettingsStore {
 
     @discardableResult
     func save(_ value: LiltSettings) -> Bool {
-        guard (1...180).contains(value.focusMinutes) else { error = .invalid; return false }
+        guard (1...180).contains(value.focusMinutes), (1...3650).contains(value.shelfShortDays),
+              (1...3650).contains(value.shelfLongDays), value.displayID.isEmpty || UUID(uuidString: value.displayID) != nil else { error = .invalid; return false }
         do {
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
             try JSONEncoder().encode(value).write(to: file, options: .atomic)

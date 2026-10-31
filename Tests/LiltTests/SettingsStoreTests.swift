@@ -17,7 +17,43 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.value.musicSource, .spotify)
         XCTAssertFalse(store.value.brainFMEnabled)
         XCTAssertEqual(store.value.focusMinutes, 25)
+        XCTAssertEqual(store.value.shelfShortDays, 7)
+        XCTAssertEqual(store.value.shelfLongDays, 30)
         XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+    }
+
+    func testShelfRetentionSettingsMigratePersistAndValidate() throws {
+        try Data("""
+        {"musicSource":"spotify","brainFMEnabled":false,"focusMinutes":25,"focusActivity":"deepWork"}
+        """.utf8).write(to: file)
+        let store = SettingsStore(file: file)
+        XCTAssertNil(store.error)
+        XCTAssertEqual(store.value.shelfShortDays, 7)
+        XCTAssertEqual(store.value.shelfLongDays, 30)
+        let changed = try store.value.applying(["shelfShortDays": 14, "shelfLongDays": 90])
+        XCTAssertTrue(store.save(changed))
+        XCTAssertEqual(SettingsStore(file: file).value, changed)
+        XCTAssertEqual(changed.payload["shelfLongDays"] as? Int, 90)
+        for change: [String: Any] in [["shelfShortDays": true], ["shelfLongDays": 0],
+                                     ["shelfShortDays": 3651], ["shelfLongDays": 1.5],
+                                     ["shelfLongDays": Double.infinity]] {
+            XCTAssertThrowsError(try changed.applying(change))
+        }
+    }
+
+    func testDisplayPreferencePersistsAndOldSettingsDefaultToAutomatic() throws {
+        try Data("""
+        {"musicSource":"spotify","brainFMEnabled":false,"focusMinutes":25,"focusActivity":"deepWork"}
+        """.utf8).write(to: file)
+        let store = SettingsStore(file: file)
+        XCTAssertEqual(store.value.displayID, "")
+        let id = UUID().uuidString
+        let selected = try store.value.applying(["displayID": id])
+        XCTAssertTrue(store.save(selected))
+        XCTAssertEqual(SettingsStore(file: file).value.displayID, id)
+        XCTAssertThrowsError(try selected.applying(["displayID": "not-a-uuid"]))
+        XCTAssertThrowsError(try selected.applying(["displayID": true]))
+        XCTAssertEqual(try selected.applying(["displayID": ""]).displayID, "")
     }
 
     func testMusicIntegrationAndFocusDefaultsSurviveReopening() throws {

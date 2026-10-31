@@ -1,5 +1,54 @@
 # Status · 2026-10-31
 
+## Beta 2 release preparation
+
+- Requested scope: publish a new beta and push the current feature work, including the settings redesign. The public-facing documentation has been revised in English; historical entries below retain their original language.
+- Local source checks passed: 97 Swift tests, 17 Node tests, shell syntax, `git diff --check` and local documentation links. SwiftPM required temporary caches and `--disable-sandbox` in this environment.
+- Release evidence, CI and public download verification must be checked against the exact committed revision. Simulated swipe tests do not establish real trackpad performance. Intel, external display, AirDrop and live Spotify checks remain open.
+
+## Wischanimation · Frame-Takt und Loslassen
+
+- Nach erneutem Nutzerfeedback wurden Eingabeübertragung und Bewegungsrhythmus gezielt überarbeitet. Wartende native Ereignisse werden ohne Verlust ihrer Reihenfolge gebündelt; höchstens ein JavaScript-Aufruf ist gleichzeitig unterwegs. Das WebView schreibt die gemeinsame Seitenposition einmal pro Bildschirmframe. Native Eingabezeitpunkte bestimmen die geglättete Loslassgeschwindigkeit statt asynchroner JavaScript-Ankunftszeiten.
+- Inhalt und Tab-Markierung folgen derselben Position. Die kritisch gedämpfte Feder läuft ruhiger aus, erhält Gegenbewegung beim Abbruch und beendet sich bei unsichtbarem Restweg. Neue Gesten übernehmen weiterhin die laufende Position. Scrollen, Datei-Drag, Tastatur und reduzierte Bewegung bleiben berücksichtigt. Keine Settings-Dateien geändert.
+- Nachweise im isolierten WKWebView mit eigener Bundle-ID, eigenen Testdaten und simulierten Playern: 27 Wischprüfungen und 76 Tabprüfungen bestanden, jeweils zwei native Fensterprüfungen. Der neue Burst-Test bestätigt für 80 Ereignisse zwischen zwei Frames genau einen Transform-Schreibvorgang pro Seite und den vollständigen Weg. Mit der vorherigen gebündelten Oberfläche scheiterten genau die drei neuen Prüfungen zu Frame-Bündelung und kontinuierlicher Tab-Markierung. Belege: `docs/evidence/swipe-sol-baseline.json`, `swipe-sol-frame-paced.json`, `swipe-sol-tabs.json`; Zwischenstand `swipe-sol-midgesture.png` visuell geprüft.
+- 97 Swift- und 17 Node-Tests sowie Shell-Syntax und Diff-Prüfung bestanden. SwiftPM verwendete isolierte temporäre Caches und `--disable-sandbox`. Der finale Build wurde mit unveränderter Meld-Brücke und identischer Signaturanforderung gestartet; seine Web-Dateien stimmen mit den Quellen einschließlich Settings-Rework überein. Die vorherige App bleibt unter `build/Lilt.before-swipe-smooth.app` erhalten.
+- Offen: echtes Trackpad, native Bridge-Latenz unter Hardwarelast und menschliche Abnahme des Bewegungsgefühls. Simulierte WebView-Gesten beweisen weder das subjektive Gefühl noch eine gemessene Bildrate des echten Trackpads.
+
+## Wischanimation überarbeitet
+
+- Nutzer lehnte die bisherige Wischbewegung ab und beauftragte ausdrücklich einen Sol-Subagenten mit `emil-animations`. Die überarbeitete Einstellungsoberfläche ist bestehende Nutzerarbeit und wurde nicht verändert.
+- Der Wisch folgt einer gemeinsamen Position statt verdoppeltem Weg und getrennt animierten Ansichten. Abbruch, Umkehr, Randwiderstand und Unterbrechung sind berücksichtigt. Normale Tabübergänge bleiben erhalten; eine bei der Integration entdeckte Regression wurde behoben.
+- Prüfung: 97 Swift- und 17 Node-Tests bestanden; 76 Tab- und 23 Wischprüfungen sowie native Fensterprüfungen im isolierten WKWebView mit simulierten Eingaben bestanden. Sechs Einstellungsdateien per Prüfsumme unverändert; der Test-Build enthält die überarbeiteten Web-Dateien. Echte Trackpad-Abnahme steht aus.
+- Der ältere Einstellungen-Diagnoselauf hatte zwei fehlgeschlagene Prüfungen zur vorherigen Player-Auswahlgestaltung; die aktuelle Einstellungsoberfläche nutzt andere Farben statt der dort vorausgesetzten Mischung. Die übrigen Einstellungen wurden dabei geladen. Die zwei alten visuellen Erwartungen sind nicht als Erfolg verbucht.
+- Abschluss: Der aktuelle Build wurde mit identischer Entwicklungssignatur und unveränderter Meld-Brücke gestartet. Die gebündelten Web-Dateien stimmen mit dem aktuellen Projektstand einschließlich des Settings-Reworks überein. Der vorherige Build bleibt unter `build/Lilt.before-swipe-polish.app`. Der laufende Prozess wurde bestätigt; Bediengefühl und tatsächliche Berechtigungen wurden nicht erneut live abgenommen.
+
+## Shelf und weitere Erweiterungen · lokaler Stand
+
+- Ziel: scrollbarere Liste ohne bisherige 24-Dateien-Grenze, Mehrfachauswahl, gemeinsames Ziehen und Teilen sowie individuell einstellbare Aufbewahrung. Einträge laufen standardmäßig nach sieben Tagen ab; ausdrücklich länger aufbewahrte Einträge nach 30 Tagen ab Markierung. Einstellungen wirken nur auf zukünftige Fristen. Originaldateien bleiben unverändert.
+- Gestaltung: Liste mit kleinen Vorschauen, kontextuelle Aktionen; Text bleibt außerhalb der physischen Notch. Der Nutzer delegierte die Umsetzung an Subagenten.
+- Umsetzung: Liste, Mehrfachauswahl, Teilen und gemeinsames Herausziehen, feste individuelle Ablaufdaten und Einstellungen implementiert. JPEG-/PNG-Vorschauen werden begrenzt im Hintergrund erzeugt; ab dem 129. Eintrag und für andere Dateitypen wird ein Symbol verwendet. Bestehende Einträge ohne Frist bleiben erhalten.
+- Zusätzlich: Fokusintervalle mit bestätigtem Übergang, optionale Brain.fm-Verbindung und Bildschirmwahl mit Rückfall bei getrenntem Bildschirm implementiert. Die Notch-Geometrie schützt auch bei langen Texten und unsicheren Bildschirmdaten. Horizontale präzise Wischbewegungen wechseln zwischen Tabs; die vertikal scrollende Shelf-Liste bleibt nutzbar. Ein Wisch wechselt höchstens einen Tab. AppKit-Scrollereignisse belegen die Fingerzahl nicht eindeutig, sodass auch andere präzise Scrollgeräte auslösen können.
+- Prüfung: 91 Swift-Tests und 15 Node-Tests bestanden; SwiftPM benötigte `--disable-sandbox`, da die verschachtelte Sandbox blockiert war. Isolierter Release-Build ohne Meld und strikte Ad-hoc-Signaturprüfung bestanden. Im WKWebView mit simulierten Playern bestanden Shelf-/Fokusprüfungen sowie 28 Notch-Geometrieprüfungen im finalen Bundle. Einstellungen wurden in einem vorherigen Integrationsbuild mit simulierten Eingaben geprüft.
+- Grenzen: echtes gemeinsames Ziehen, Teilen/AirDrop, zusätzliche MacBook-Modelle und externe Monitore inklusive Vollbild sind nicht live geprüft. Fokusintervalle wurden mit simuliertem Brain.fm geprüft. Menschliche Designabnahme steht aus. Kein Commit, Push oder Release.
+
+## Wischgeste · 31. Oktober 2026
+
+- Nutzer beauftragte die Umsetzung der Wischgeste. Phasenbehaftete horizontale Scrollbewegungen oberhalb einer Schwelle wechseln einen Tab; vertikale Gesten, Nachlauf, Datei-Drag, horizontal scrollbare Flächen und geöffnete Fokusmenüs lösen keinen Wechsel aus. Das Scrollereignis bleibt erhalten; an den Enden wird nicht umgebrochen. Die Systemscrollrichtung bestimmt die Richtung.
+- 95 Swift- und 15 Node-Tests bestanden; neun UI-Prüfungen mit simulierten Gesten und zwei native Fensterprüfungen bestanden im isolierten WKWebView-Build. Build ohne Meld, Testdaten und simulierte Player. SwiftPM wurde wegen der blockierten verschachtelten Sandbox mit `--disable-sandbox` ausgeführt.
+- Ein echtes Magic Trackpad, beide macOS-Scrollrichtungen und andere präzise Eingabegeräte wurden nicht live getestet. AppKit bestätigt bei den verwendeten Scrollereignissen die Zahl der Finger nicht. Keine Aussage über Hardware-Abnahme.
+
+## Wischübergang · lokal umgesetzt
+
+- Nutzer bestätigte den macOS-Schreibtischwechsel als Referenz: Ansichten sollen sich seitlich mit dem Wisch bewegen. Die bestehenden Wechsel per Klick und Tastatur bleiben erhalten; reduzierte Bewegung und Shelf-Scrollen werden berücksichtigt.
+- Umsetzung: Während eines horizontalen Wischs verschieben sich die aktuelle und die benachbarte Ansicht seitlich. Beim Loslassen erfolgt ein Wechsel oder ein Zurückgleiten; Richtung und Bewegung können vorher umgekehrt werden. Klick und Tastatur behalten ihren bisherigen Übergang, reduzierte Bewegung wechselt unmittelbar.
+- Prüfung: 96 Swift- und 15 Node-Tests bestanden. 15 Prüfungen im isolierten WKWebView deckten unter anderem Zwischenposition, Abbruch, Richtungsumkehr, Scroll-/Drag-Ausschluss und Umschalten auf reduzierte Bewegung ab; zwei native Fensterprüfungen bestanden. Isolierter Release-Build und Signatur geprüft; Zwischenstand visuell kontrolliert. Eingaben waren simuliert, die echte Trackpad-Bewegung und beide Systemscrollrichtungen sind weiterhin nicht live abgenommen.
+
+## Wischgeste im regulären App-Build · 31. Oktober 2026
+
+- Nutzer meldete, dass Wischen nicht funktionierte. Der tatsächlich gestartete ältere App-Build enthielt die Funktion nicht. Horizontales Wischen ist nun zusätzlich über der vertikal scrollbaren Shelf-Liste möglich; horizontale Scrollbereiche und Datei-Drag bleiben ausgenommen.
+- Der aktualisierte Build verwendet die gleiche macOS-Signaturanforderung und Kennung wie der bisherige Build. Entgegen der anfänglichen Annahme war die passende Identität verfügbar; beide Signaturanforderungen wurden verglichen. Die vorhandene Meld-Brücke wurde bytegleich übernommen. Signaturprüfung bestanden.
+- 17 WKWebView-Prüfungen mit simulierten Gesten und zwei native Fensterprüfungen bestanden, darunter Shelf-Scrollen und Wischen. Die reguläre App wurde neu gestartet und der laufende Prozess sowie der gebündelte Wisch-Code bestätigt. Die vorherige App liegt unter `build/Lilt.before-swipe-update.app`. Ein echter Trackpad-Test und eine erneute Prüfung der macOS-Berechtigungen stehen aus.
+
 ## Download-Release · v0.1.0-beta.1 veröffentlicht und geprüft
 
 - Nutzerauftrag: fertige Mac-App als GitHub-Release veröffentlichen, damit andere sie ohne eigenen Build installieren können. Nach Prüfung der vorhandenen Apple-Zugänge wählte der Nutzer ausdrücklich eine nicht notarisierte Testversion mit macOS-Ausnahme beim ersten Start.

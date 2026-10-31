@@ -1,80 +1,29 @@
-# Plan: Shelf, Fokusintervalle und Bildschirme ohne Notch
+# Feature plan and acceptance checks
 
-Stand: 31. Oktober 2026. Dieser Plan beschreibt zukünftige Arbeit, keine bereits umgesetzten Funktionen. Die vereinbarten direkten Musikverbindungen, der unabhängige Fokus-Timer und die Einstellungen stehen in [SPEC.md](../SPEC.md) und gehen diesen Erweiterungen voraus. Ihr tatsächlicher Umsetzungs- und Prüfstand steht in [STATUS.md](../STATUS.md).
+This document records the agreed direction for Shelf, focus intervals, display support and trackpad navigation. Parts are implemented in the working tree. [STATUS.md](../STATUS.md) records the evidence and remaining checks; [SPEC.md](../SPEC.md) contains the project specification and its historical decisions.
 
-## Ziel und Reihenfolge
+## Notch sizes and trackpad navigation
 
-Lilt bleibt eine ruhige App für Musik, Fokus und Dateien. Bestehende Notch-Form, Bewegungen, Tabs und zugängliche Bedienung bilden die Grundlage.
+Lilt should keep content outside the physical camera notch on MacBooks with different notch sizes. When screen data is missing or implausible, the app should choose a safe fallback. Check both compact and open states, long text and several notch dimensions. Tests using modelled geometry do not replace checks on different MacBook models.
 
-## Verschiedene MacBook-Notches
+A horizontal trackpad swipe switches between Music, Focus and Shelf. Click and keyboard navigation remain available. Gestures should respect macOS scrolling direction and must not interfere with horizontal scrolling or file drag. Verify both directions, every tab transition and reduced motion on an actual Magic Trackpad. AppKit's scroll events do not by themselves prove the number of fingers.
 
-Lilt soll auf MacBooks verschiedener Größen mit unterschiedlichen Notch-Abmessungen korrekt funktionieren. Die kompakte und geöffnete Darstellung sollen sich an die jeweilige Hardware anpassen; Position, Übergänge und Bedienelemente müssen dabei stimmen. Auch fehlende oder unplausible Bildschirmdaten sind nachvollziehbar zu behandeln.
+## Shelf
 
-Abnahme: Geometrie für verschiedene Notch-Breiten und -Höhen automatisiert prüfen und die gerenderte App auf unterschiedlichen echten MacBook-Modellen hinsichtlich Position, Darstellung und Bedienung testen. Nicht verfügbare Modelle als fehlenden Hardware-Nachweis dokumentieren.
+Shelf is a local collection of file references. Users can select one or more files, preview or open an individual item, show it in Finder, drag the selection out or use the macOS sharing menu. Removing a reference never deletes or moves the original file.
 
-## Navigation mit dem Magic Trackpad
+The current direction is a scrollable list with readable names and small previews. It must handle empty, missing, duplicate-name and large collections. New references receive the short retention period; explicitly extending an item starts its long period at that moment. Changing a default affects future decisions, not existing deadlines. Legacy references without a deadline remain until removed.
 
-In der geöffneten Notch soll ein horizontaler Zwei-Finger-Wisch nach links oder rechts zwischen Music, Focus und Shelf wechseln. Die bestehenden Klick- und Tastaturwege bleiben erhalten. Die Geste soll nicht versehentlich auslösen, wenn Inhalte horizontal gescrollt oder Dateien gezogen werden. Richtung und Verhalten an den Enden der Tab-Reihe werden beim Entwurf festgelegt; die macOS-Einstellung für die Scrollrichtung ist zu berücksichtigen.
+Acceptance needs isolated files and a comparison of originals before and after actions. Check mouse and keyboard selection, persistence across restart, expiry, missing files, Quick Look, Finder, shared dragging and sharing. A complete AirDrop check needs a receiving device. Record rendered UI checks and human design review separately.
 
-Abnahme: Beide Wischrichtungen und alle Tab-Übergänge auf einem echten Magic Trackpad prüfen. Horizontales Scrollen im Shelf, Drag-and-drop, Klicks und Tastaturbedienung dürfen nicht beeinträchtigt werden. Übergänge mit aktivierter reduzierter Bewegung gesondert prüfen.
+## Focus intervals
 
-1. Bereits vereinbarte Musik-, Fokus- und Einstellungsarbeit abschließen und prüfen.
-2. Shelf als zusammenhängenden Schritt überarbeiten: Oberfläche, Mehrfachauswahl und Teilen.
-3. Optionale Fokus- und Pausenintervalle auf dem unabhängigen Timer aufbauen.
-4. Nutzung auf Bildschirmen ohne Notch gesondert gestalten und umsetzen.
+The standalone timer can use a sequence of work and break phases. Users choose the durations before starting; the next phase requires an explicit action. Breaks do not start music automatically. Brain.fm remains optional and must not block the standalone timer.
 
-## 1. Shelf: Oberfläche und Dateiaktionen
+Check phase changes, pause, resume, cancellation and restoration. Verify the compact view and keyboard controls in the rendered app. Keep simulated-player evidence separate from tests against an actual Brain.fm installation.
 
-### Ergebnis
+## Displays without a physical notch
 
-Dateien sind schnell erkennbar und können einzeln oder gemeinsam ausgewählt, geöffnet, betrachtet, herausgezogen und geteilt werden. Zusätzliche Aktionen erscheinen im Kontext der Auswahl, ohne die Oberfläche dauerhaft zu überladen.
+A small area at the top of a display without a notch provides access to Music, Focus and Shelf. Users can choose a display in settings. The automatic selection prefers a physical notch, then the main display. If a selected display disconnects, Lilt temporarily falls back and can return to it after reconnection.
 
-- Dateinamen und geeignete Vorschauen beziehungsweise Dateisymbole gut lesbar darstellen. Lange und gleiche Namen unterscheidbar machen.
-- Leeren Zustand, aktives Hineinziehen, Auswahl, viele Dateien und nicht verfügbare Dateien sichtbar und verständlich gestalten.
-- Mehrfachauswahl per ⌘-Klick, zusammenhängende Auswahl per ⇧-Klick sowie zugängliche Tastaturbedienung vorsehen. Einzelne Dateien bleiben einfach zu öffnen und in Quick Look anzusehen.
-- Ausgewählte Dateien gemeinsam herausziehen und über das macOS-Teilen-Menü übergeben; AirDrop ist dort ein mögliches Ziel, sofern verfügbar.
-- Einzelne oder mehrere Einträge entfernen. Das entfernt ausschließlich Lilts gespeicherte Verweise; Originaldateien werden weder verschoben noch gelöscht. Auch Clear behält diese Bedeutung.
-- Bestehende Wiederherstellung nach Neustart, Finder-Aktion, lokale Dateiverweise und den Umgang mit fehlenden Dateien erhalten.
-
-### Design und Prüfung
-
-Vor der Implementierung die tatsächliche Shelf-Oberfläche und ihre Platzverhältnisse prüfen und ein konkretes Konzept für Datei-Kacheln, Auswahl, Aktionen und Fehlerzustände erarbeiten. Die verpflichtende UI-Beratung nach Projektregeln einbeziehen. Notch-Geometrie und vereinbarte Bewegungen erhalten; reduzierte Bewegung berücksichtigen.
-
-Abnahme: Dateien einzeln und mehrfach mit Maus und Tastatur auswählen; Vorschau, Finder, gemeinsames Herausziehen, Teilen und Entfernen prüfen. Leeren Zustand, viele Einträge, gleichnamige und fehlende Dateien sowie Wiederherstellung nach Neustart prüfen. Originale von Testdateien vor und nach den Aktionen vergleichen. Das gerenderte Ergebnis prüfen; für einen vollständigen AirDrop-Test wird ein empfangendes Gerät benötigt. Menschliche Designabnahme gesondert festhalten.
-
-## 2. Optionale Fokus- und Pausenintervalle
-
-### Ergebnis
-
-Neben einer einzelnen Sitzung kann eine Folge aus Arbeits- und Pausenzeiten gewählt werden. Dauer und aktuelle Phase sind verständlich; die kompakte Notch zeigt die laufende Zeit und unterscheidet Arbeit von Pause.
-
-- Arbeits- und Pausendauer vor Beginn einstellen; Start, Pause, Fortsetzen und Beenden für beide Phasen anbieten.
-- Phasenende dezent anzeigen. Vorschlag: Die nächste Phase beginnt erst nach ausdrücklicher Bestätigung.
-- Zustand nach Neustart nachvollziehbar wiederherstellen und keine Musik ungefragt starten.
-- Brain.fm bleibt optional und darf den unabhängigen Timer nicht blockieren.
-
-### Offene Entscheidungen und Prüfung
-
-Vor Umsetzung festlegen, ob und wie viele Intervalle vorausgeplant werden, wie Pausen übersprungen werden und ob Brain.fm beim Phasenwechsel pausiert oder fortgesetzt werden soll. Verhalten bei geschlossener App und überfälliger Phase ausdrücklich definieren.
-
-Abnahme: Beide Phasen und ihre Übergänge einschließlich Pause, Fortsetzen, Abbruch und Neustart prüfen. Kompakte Anzeige und Tastaturbedienung im gerenderten Ergebnis prüfen. Unabhängigen Timer und optionale echte Brain.fm-Verbindung getrennt nachweisen.
-
-## 3. Bildschirme ohne physische Notch
-
-### Ergebnis
-
-Auf einem Mac oder externen Bildschirm ohne Notch lässt sich Lilt über eine kleine Fläche am oberen Bildschirmrand öffnen. Music, Focus und Shelf bleiben erreichbar.
-
-- Position und Form passend zur Menüleiste gestalten und in den Einstellungen eine Bildschirmwahl ermöglichen.
-- Bildschirmwechsel, Trennen und Wiederverbinden sowie unterschiedliche Auflösungen berücksichtigen.
-- Bestehende Bedienung auf einem Bildschirm mit Notch erhalten.
-
-### Offene Entscheidungen und Prüfung
-
-Vor Umsetzung festlegen, auf welchen Bildschirmen Lilt standardmäßig erscheint und wie sich die Fläche bei Vollbild und mehreren Monitoren verhält. Das Design anhand eines gerenderten Entwurfs prüfen.
-
-Abnahme: Öffnen, Schließen, Tabs, Fokus und Shelf auf einem Bildschirm ohne Notch und auf einem mit Notch prüfen. Bildschirmwechsel und Menüleistenüberschneidungen auf echter Hardware testen. Fehlende Hardware als offene Prüfgrenze dokumentieren.
-
-## Allgemeine Nachweise
-
-Für jede Erweiterung relevante Logiktests und bestehende Projektchecks ausführen. Datei- und automatisierte Tests, tatsächliche App-Bedienung, externe Geräte und menschliche Designabnahme getrennt dokumentieren. Bestehende Änderungen im Arbeitsverzeichnis bei der Umsetzung erhalten.
+Check opening and closing, all tabs, display switching, disconnection, reconnection, fullscreen behavior and menu-bar overlap on actual displays. Record unavailable hardware as an open test limit.

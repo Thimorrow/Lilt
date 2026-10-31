@@ -1,10 +1,10 @@
-# An Lilt mitarbeiten
+# Contributing to Lilt
 
-Kleine, klar begrenzte Beiträge sind willkommen. Größere Änderungen zuerst in einem [Issue](https://github.com/Thimorrow/Lilt/issues) besprechen. Bestehende Gestaltung, zugängliche Bedienung und lokale Datenverarbeitung erhalten.
+Small, focused contributions are welcome. Please discuss larger changes in an [issue](https://github.com/Thimorrow/Lilt/issues) first. Preserve the existing interaction design, accessibility and local data handling.
 
-## Lokal starten
+## Set up
 
-Benötigt werden macOS 15 oder neuer, Xcode mit Swift und Node.js für die JavaScript-Tests. Die CI verwendet Node.js 24. Android ist ausschließlich für die optionale Meld-Anbindung erforderlich.
+You need macOS 15 or later, Xcode/Swift and Node.js. CI uses Node.js 24. Android is needed only for the optional Meld integration.
 
 ```sh
 git clone https://github.com/Thimorrow/Lilt.git
@@ -13,9 +13,9 @@ LILT_BUILD_MELD=0 LILT_SIGN_IDENTITY=- ./scripts/build-app.sh
 open build/Lilt.app
 ```
 
-Ad-hoc-Signierung benötigt kein Apple-Entwicklerkonto. Sie ist für lokale Builds gedacht; macOS-Berechtigungen können nach Neubauten erneut nötig sein. Der Quellcode-Start ist kein notarisiertes App-Release.
+The command uses an ad-hoc signature and does not require an Apple developer account. macOS permissions may need to be granted again after rebuilding. If you depend on existing permissions, retain the app's working development identity. This local build is not a notarized release.
 
-## Prüfen
+## Verify changes
 
 ```sh
 swift test
@@ -24,15 +24,15 @@ bash -n scripts/build-app.sh scripts/build-meld-bridge.sh
 git diff --check
 ```
 
-Die GitHub-CI führt Tests, einen Release-Build ohne Android, eine Signaturprüfung und einen Gitleaks-Scan des Git-Verlaufs aus. Lokale App-/Playerprüfungen bleiben davon getrennt. Anleitungen für isolierte WKWebView-Prüfungen stehen im [README](README.md).
+CI runs automated tests, builds without Android, checks bundled licences and scans Git history for secrets. These checks do not replace testing the app, real players or hardware.
 
-Tests mit `--ui-test-dir` oder einem eigenen `--data-dir` isolieren. Die normale App und echte Nutzerdaten nicht für automatisierte Wiederholungen verwenden. Echte Musiksteuerung oder Berechtigungsdialoge gezielt prüfen und anschließend den ursprünglichen Playerzustand wiederherstellen. Diagnoseaufnahmen können Titel, Dateipfade oder andere persönliche Inhalte enthalten und bleiben außerhalb des Repositorys.
+Use `--ui-test-dir` or a separate `--data-dir` for repeatable tests. Diagnostic and smoke modes suppress real player control unless an explicit live flag is supplied. Do not stop an existing user instance to run a test. Diagnostic captures can contain private filenames, paths or track information; keep them out of Git. The diagnostic interface is described in [docs/BRIDGE.md](docs/BRIDGE.md).
 
-## Pull Requests
+## Pull requests
 
-- Beschreiben, welches Problem die Änderung löst und wie sie geprüft wurde.
-- Relevante Logiktests ergänzen; sichtbare Änderungen zusätzlich in der tatsächlichen App bedienen. Fehlende Live-/Hardwareprüfungen nennen.
-- Keine Zugangsdaten, Signierschlüssel, Kontodaten, Diagnoseaufnahmen oder Build-Ausgaben einchecken.
-- Beiträge werden unter der Projektlizenz MIT eingereicht; Drittanbieterlizenzen und [Credits](THIRD_PARTY_NOTICES.md) erhalten.
+- Explain the problem, the resulting behavior and how you tested it.
+- Add tests for meaningful changes in behavior. Operate visible changes in the app and call out missing live or hardware checks.
+- Do not commit credentials, signing keys, account data, diagnostic captures or build output.
+- Contributions use the MIT licence. Preserve third-party licences and [credits](THIRD_PARTY_NOTICES.md).
 
-Sicherheitsprobleme gemäß [SECURITY.md](SECURITY.md) vertraulich melden.
+Report security issues privately as described in [SECURITY.md](SECURITY.md).

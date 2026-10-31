@@ -17,6 +17,7 @@ struct FocusSession: Codable, Equatable {
     var verifiedAt: Date?
     var needsFinish = false
     var brainFMEnabled: Bool?
+    var intervals: FocusIntervals?
 
     func seconds(at now: Date) -> Int {
         Int(ceil(max(0, deadline.map { $0.timeIntervalSince(now) } ?? remaining)))
@@ -104,18 +105,23 @@ final class FocusCoordinator {
                 session.needsFinish = false
                 error = .init(code: "integration_changed", message: "Die Fokus-Verbindung wurde geändert. Die vorherige Sitzung ist pausiert; Musik wurde nicht verändert.")
                 retry = .start
-            } else if brainFMEnabled {
+            } else if brainFMEnabled, saved.intervals?.phase != .rest {
                 restoring = saved.owned
             } else if saved.phase == .running, saved.seconds(at: now()) == 0 {
                 complete()
             }
         } else { session = FocusSession() }
+        if let intervals = session.intervals, !intervals.isValid || intervals.currentMinutes * 60 != session.duration {
+            session.intervals = nil
+        }
         session.brainFMEnabled = brainFMEnabled
     }
 
     var integrationLocked: Bool {
         pending != nil || restoring || (session.phase != .idle && session.phase != .completed)
     }
+
+    var canApplyDefaults: Bool { session.phase == .idle && session.intervals == nil }
 
     @discardableResult
     func setBrainFMEnabled(_ enabled: Bool) -> Bool {
@@ -142,14 +148,45 @@ final class FocusCoordinator {
     func configure(activity: FocusActivity, minutes: Int) {
         guard pending == nil, !restoring, (1...180).contains(minutes), session.phase != .running, session.phase != .uncertain else { return }
         configurationRevision += 1
+        if session.intervals != nil, minutes == session.duration / 60, activity != session.activity {
+            session.activity = activity
+            if session.phase == .paused { session.owned = false }
+            error = nil; retry = nil
+            save(); publish(); return
+        }
         session.configure(activity: activity, minutes: minutes)
         error = nil; retry = nil
         save(); publish()
     }
 
+    func configureIntervals(workMinutes: Int, restMinutes: Int) {
+        guard pending == nil, !restoring, session.phase == .idle || session.phase == .completed,
+              let intervals = FocusIntervals(workMinutes: workMinutes, restMinutes: restMinutes) else { return }
+        session = FocusSession(activity: session.activity, duration: workMinutes * 60,
+                               remaining: Double(workMinutes * 60), brainFMEnabled: brainFMEnabled,
+                               intervals: intervals)
+        error = nil; retry = nil
+        save(); publish()
+    }
+
+    func nextInterval() {
+        guard pending == nil, !restoring, var intervals = session.intervals,
+              intervals.state == .awaitingNext, session.phase == .completed else { return }
+        intervals.prepareNext()
+        session = FocusSession(activity: session.activity, duration: intervals.currentMinutes * 60,
+                               remaining: Double(intervals.currentMinutes * 60), brainFMEnabled: brainFMEnabled,
+                               intervals: intervals)
+        error = nil; retry = nil
+        save(); publish()
+        request(.start)
+    }
+
+    private var usesBrainFM: Bool { brainFMEnabled && session.intervals?.phase != .rest }
+
     func request(_ action: Action) {
         guard pending == nil, !restoring else { return }
-        if !brainFMEnabled {
+        if action == .start, session.intervals?.state == .awaitingNext { return }
+        if !usesBrainFM {
             applyIndependent(action)
             return
         }
@@ -177,7 +214,10 @@ final class FocusCoordinator {
                 guard playback == expected else { self.fail(.timeout, retry: request.action); return }
                 if request.action == .reset { self.session.reset() }
                 else if request.action == .finish { self.complete() }
-                else { self.session.confirm(playback, at: self.now()) }
+                else {
+                    self.session.confirm(playback, at: self.now())
+                    if request.action == .start { self.session.intervals?.started() }
+                }
                 self.error = nil; self.retry = nil
             case .failure(let error):
                 if request.action == .reset, error == .activity {
@@ -198,7 +238,7 @@ final class FocusCoordinator {
         configurationRevision += 1
         switch action {
         case .start:
-            if session.phase != .running { session.confirm(.playing, at: now()) }
+            if session.phase != .running { session.confirm(.playing, at: now()); session.intervals?.started() }
         case .pause:
             if session.phase == .running { session.confirm(.paused, at: now()) }
         case .reset: session.reset()
@@ -215,13 +255,14 @@ final class FocusCoordinator {
         session.owned = false
         session.needsFinish = false
         session.verifiedAt = now()
+        session.intervals?.completed()
     }
 
     func tick() {
         let date = now()
         if !restoring, pending == nil, session.phase == .running, session.seconds(at: date) == 0 {
             request(.finish)
-        } else if brainFMEnabled, session.owned, pending == nil, !polling, date.timeIntervalSince(lastPoll) >= 3 {
+        } else if usesBrainFM, session.owned, pending == nil, !polling, date.timeIntervalSince(lastPoll) >= 3 {
             poll()
         }
         if date.timeIntervalSince(lastSave) >= 5, session.owned { save() }
@@ -229,13 +270,13 @@ final class FocusCoordinator {
     }
 
     func recheck() {
-        if !brainFMEnabled { tick(); return }
+        if !usesBrainFM { tick(); return }
         guard session.owned, !polling, pending == nil else { return }
         poll()
     }
 
     private func poll() {
-        guard brainFMEnabled, !polling else { return }
+        guard usesBrainFM, !polling else { return }
         polling = true
         let activity = session.activity
         let revision = configurationRevision
@@ -257,15 +298,12 @@ final class FocusCoordinator {
                 }
                 if self.session.needsFinish {
                     if playback == .paused {
-                        self.session.deadline = nil
-                        self.session.remaining = 0
-                        self.session.phase = .completed
-                        self.session.owned = false
-                        self.session.needsFinish = false
+                        self.complete()
                         self.error = nil; self.retry = nil
                     } else if wasRestoring { shouldFinish = true }
                 } else {
                     self.session.confirm(playback, at: self.now())
+                    if self.session.phase == .completed { self.session.intervals?.completed() }
                     self.error = nil; self.retry = nil
                     shouldFinish = self.session.phase == .running && self.session.seconds(at: self.now()) == 0
                 }
@@ -304,6 +342,9 @@ final class FocusCoordinator {
          "remaining": session.seconds(at: now()), "deadline": session.deadline.map { $0.timeIntervalSince1970 * 1000 } as Any? ?? NSNull(),
          "phase": restoring ? "checking" : session.phase.rawValue, "owned": session.owned, "restoring": restoring,
          "brainFMEnabled": brainFMEnabled, "integrationLocked": integrationLocked,
+         "interval": session.intervals.map { ["workMinutes": $0.workMinutes, "restMinutes": $0.restMinutes,
+                                              "phase": $0.phase.rawValue, "state": $0.state.rawValue,
+                                              "completedWorkPeriods": $0.completedWorkPeriods] as [String: Any] } as Any? ?? NSNull(),
          "pending": pending.map { ["id": $0.id.uuidString, "action": $0.action.rawValue] } as Any? ?? NSNull(),
          "error": error.map { ["code": $0.code, "message": $0.message, "action": retry?.rawValue ?? "start"] } as Any? ?? NSNull()]
     }
