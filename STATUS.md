@@ -1,12 +1,18 @@
 # Status · 2026-10-31
 
-## Download-Release · in Vorbereitung
+## Download-Release · v0.1.0-beta.1 veröffentlicht und geprüft
 
 - Nutzerauftrag: fertige Mac-App als GitHub-Release veröffentlichen, damit andere sie ohne eigenen Build installieren können. Nach Prüfung der vorhandenen Apple-Zugänge wählte der Nutzer ausdrücklich eine nicht notarisierte Testversion mit macOS-Ausnahme beim ersten Start.
 - Ziel: v0.1.0-beta.1 als GitHub-Prerelease, Universal-App für arm64/x86_64, macOS 15+, DMG und ZIP mit Lizenztexten, Installationsanleitung und SHA-256-Prüfsummen. Kein Anspruch auf Apple-Notarisierung oder bereits erfolgten Intel-Laufzeittest.
 - Umfang: konfigurierbare Build-Metadaten/Universal-Build, getrennte Paketierung aus committiertem sauberem Git-Stand, Download-/Release-Anleitung und passende CI-Prüfung. Keine funktionale App-Änderung und keine Änderung der bestehenden lokalen Entwicklungs-App/Signatur. Release-Bundle-ID io.github.thimorrow.Lilt; lokale Vorschau-ID bleibt erhalten.
 - Ablauf: sequenziell vorbereiten, Quelltests/CI prüfen, sauberen Commit paketieren, DMG/ZIP/Signatur/Lizenzen/Architekturen prüfen, entpackte App mit eigenen Diagnosedaten bedienen, danach neuen Tag und Prerelease mit genau diesen Assets veröffentlichen. Öffentlichen Download erneut laden und Prüfsummen abgleichen. Keine vorhandenen Releases/Tags überschreiben.
 - Ausgangslage: sauberer main auf 771be74; keine bestehenden Releases/Tags. Nur Apple-Development-Zertifikat vorhanden, kein Developer-ID-Zertifikat und kein eingerichtetes Lilt-Notarisierungsprofil. Veröffentlichung deshalb ausschließlich als ausdrücklich freigegebene nicht notarisierte Beta.
+- Veröffentlichung: https://github.com/Thimorrow/Lilt/releases/tag/v0.1.0-beta.1, ausdrücklich Prerelease und nicht als stabile neueste Version markiert. Tag und RELEASE-INFO.txt zeigen beide exakt auf 2920c66aad80e84009d6a3eb13dde4070c8febd1. Hauptdateien: Lilt-0.1.0-beta.1-universal.dmg und .zip; dazu SHA256SUMS.txt und RELEASE-INFO.txt.
+- Quellprüfung: 66 Swift- und 12 Node-Tests bestanden. Die erste zusätzliche Architekturprüfung hatte einen falschen lipo-Aufruf; vor Veröffentlichung korrigiert und für beide Varianten separat geprüft. CI des tatsächlichen Release-Quellcommits vollständig grün: https://github.com/Thimorrow/Lilt/actions/runs/41209095163 (Universal-Build, Signatur/Lizenzen, Tests und vollständiger Git-Verlauf).
+- Paketprüfung: DMG-Integrität, schreibgeschütztes Einhängen und Kopieren in isolierten Applications-Ordner, unabhängiges ZIP-Entpacken und Bytevergleich der App-Dateien bestanden. Beide CPU-Slices enthalten Mindestversion macOS 15.0; Abhängigkeiten sind System-/Swift-Bibliotheken. Ad-hoc-Signatur und alle drei Lizenztexte gültig. Gatekeeper lehnt die nicht notarisierte App erwartungsgemäß ab; die notwendige gezielte macOS-Ausnahme ist dokumentiert.
+- Laufzeit: tatsächlich aus dem DMG kopierte App mit eigenen Diagnosedaten und deaktivierten echten Playertransporten geprüft. Einstellungen 24 und unabhängiger Focus 15 Prüfungen inklusive nativer Fensterchecks bestanden. Der erste Diagnosebefehl wurde während des Starts als Altbefehl ignoriert; Wiederholung nach Diagnosebereitschaft erfolgreich. Nur die eigene Testinstanz geschlossen; die lokale Entwicklungs-App und echte Player wurden nicht ersetzt oder gesteuert.
+- Öffentlicher Download: alle vier Assets ohne Anmeldung erneut geladen, bytegleich mit den geprüften lokalen Dateien. GitHubs Asset-Digests und alle SHA-256-Manifestwerte stimmen. DMG 883021 Bytes, ZIP 560610 Bytes. Keine Nutzerdaten, Entwicklungszertifikate oder Diagnoseaufnahmen im Paket.
+- Prüfgrenzen: Laufzeit auf Apple Silicon/macOS 27.0.1, kein echter Intel-/macOS-15-/Zusatzmonitor-/Langzeitnachweis und kein erneuter echter Playerlauf für dieses Packaging. Spotify-Livetest bleibt offen. Ein notarisiertes stabiles Release ist weiterhin nicht vorhanden.
 
 ## Open-Source-Veröffentlichung · veröffentlicht und geprüft
 

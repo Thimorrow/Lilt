@@ -10,6 +10,8 @@ Der Anwendungscode steht unter [MIT](LICENSE). Credits und abweichende Drittanbi
 
 ## Mac-App herunterladen
 
+**[Lilt 0.1.0 Beta 1 herunterladen (DMG)](https://github.com/Thimorrow/Lilt/releases/download/v0.1.0-beta.1/Lilt-0.1.0-beta.1-universal.dmg)** · [ZIP](https://github.com/Thimorrow/Lilt/releases/download/v0.1.0-beta.1/Lilt-0.1.0-beta.1-universal.zip) · [Releasehinweise](https://github.com/Thimorrow/Lilt/releases/tag/v0.1.0-beta.1)
+
 Die [GitHub-Releases](https://github.com/Thimorrow/Lilt/releases) enthalten die Download-Testversion für **macOS 15 oder neuer**, Apple Silicon und Intel. Das DMG öffnen, **Lilt.app nach Programme ziehen**, das Image auswerfen und Lilt aus Programme starten. Alternativ das ZIP entpacken und die App nach Programme kopieren. Xcode und Android werden dafür nicht benötigt.
 
 Die erste Beta ist **nicht von Apple notarisiert** und nur ad-hoc signiert. Wenn macOS den ersten Start blockiert: nach dem Öffnungsversuch unter **Systemeinstellungen → Datenschutz & Sicherheit → Dennoch öffnen** gezielt diese App erlauben. Nur verwenden, wenn du dem Download vertraust. [Apples Anleitung](https://support.apple.com/en-us/102445). Auf verwalteten Macs kann diese Ausnahme gesperrt sein.
