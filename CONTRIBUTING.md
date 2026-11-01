@@ -15,6 +15,12 @@ open build/Lilt.app
 
 The command uses an ad-hoc signature and does not require an Apple developer account. macOS permissions may need to be granted again after rebuilding. If you depend on existing permissions, retain the app's working development identity. This local build is not a notarized release.
 
+## Optional Meld integration
+
+Meld is a separately configured local Android integration and is not included in the beta download. Spotify, Apple Music, standalone Focus and Shelf do not require it.
+
+Building the bridge requires Android SDK platform 34, build tools 36.0.0 and a JDK. It targets only the specifically configured local Meld emulator, not other Android devices. See [Meld control](docs/BRIDGE.md#meld-control) for the required emulator configuration and bridge behavior.
+
 ## Verify changes
 
 ```sh

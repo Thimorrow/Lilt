@@ -1,5 +1,7 @@
 # Lilt
 
+<img src="docs/images/lilt-focus.png" alt="Lilt’s expanded notch showing a 25-minute focus timer, playback controls and the Music, Focus and Shelf tabs." width="680" height="300">
+
 Lilt is a local macOS app for music, focus and files, designed around the camera notch. Its interface and motion are adapted from [Lilt, a study by Vayun Godara](https://vayun.net/studies/lilt/), with permission.
 
 ## Download
@@ -10,7 +12,7 @@ Lilt is a local macOS app for music, focus and files, designed around the camera
 2. Open Lilt from Applications. It appears at the top of the screen and in the menu bar, not in the Dock.
 3. The beta is ad-hoc signed and **not notarized by Apple**. If macOS blocks its first launch, check that the download came from this repository, then use **System Settings → Privacy & Security → Open Anyway**. See [Apple's instructions](https://support.apple.com/en-us/102445) and the [installation guide](docs/INSTALL-BETA.txt).
 
-This is an early beta. The Intel build has not been tested on an Intel Mac, and real Spotify playback, trackpad gestures, external displays, AirDrop and long-running sessions need further testing. The download does not include the optional Meld Android bridge.
+This is an early beta. The Intel build has not been tested on an Intel Mac, and real Spotify playback, trackpad gestures, external displays, AirDrop and long-running sessions need further testing. The download does not include the [optional Meld Android integration](CONTRIBUTING.md#optional-meld-integration).
 
 ## Use Lilt
 
@@ -19,8 +21,6 @@ Click the compact notch or press ⌃⌥L from any app to open it. Use the Music,
 ### Music
 
 Choose Spotify or Apple Music in settings, install and open that Mac app, and select a track there. **Connect** explicitly asks macOS for permission to control the selected player. Checking the connection does not start playback. Playback and track information come from the selected app; Lilt does not use global media keys or store account credentials.
-
-Meld is an optional, separately configured local Android integration. It is not included in the beta download. Building it requires Android SDK platform 34, build tools 36.0.0 and a JDK. The local bridge targets the specifically configured Meld emulator; it does not control other Android devices.
 
 ### Focus
 
