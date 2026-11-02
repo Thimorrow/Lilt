@@ -94,7 +94,7 @@ extension AppDelegate: QLPreviewPanelDataSource, QLPreviewPanelDelegate, NSShari
                   let x = region["x"] as? Double, let y = region["y"] as? Double,
                   let width = region["width"] as? Double, let height = region["height"] as? Double,
                   [x, y, width, height].allSatisfy(\.isFinite), x >= 0, y >= 0, width > 0, height > 0,
-                  x + width <= webView.bounds.width + 1, y + height <= webView.bounds.height + 1 else { return nil }
+                  x + width <= Double(webView.bounds.width) + 1, y + height <= Double(webView.bounds.height) + 1 else { return nil }
             return (id, CGRect(x: x, y: y, width: width, height: height))
         }
     }
