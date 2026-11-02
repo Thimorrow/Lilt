@@ -2,7 +2,7 @@
 
 <img src="docs/images/lilt-focus.png" alt="Lilt’s expanded notch showing a 25-minute focus timer, playback controls and the Music, Focus and Shelf tabs." width="680" height="300">
 
-Lilt is a local macOS app for music, focus and files, designed around the camera notch. Its interface and motion are adapted from [Lilt, a study by Vayun Godara](https://vayun.net/studies/lilt/), with permission.
+Lilt is a local macOS app for music, focus, files and notifications, designed around the camera notch. Its interface and motion are adapted from [Lilt, a study by Vayun Godara](https://vayun.net/studies/lilt/), with permission.
 
 ## Download
 
@@ -12,7 +12,7 @@ Lilt is a local macOS app for music, focus and files, designed around the camera
 2. Open Lilt from Applications. It appears at the top of the screen and in the menu bar, not in the Dock.
 3. The beta is ad-hoc signed and **not notarized by Apple**. If macOS blocks its first launch, check that the download came from this repository, then use **System Settings → Privacy & Security → Open Anyway**. See [Apple's instructions](https://support.apple.com/en-us/102445) and the [installation guide](docs/INSTALL-BETA.txt).
 
-This is an early beta. The Intel build has not been tested on an Intel Mac, and real Spotify playback, trackpad gestures, external displays, AirDrop and long-running sessions need further testing. The download does not include the [optional Meld Android integration](CONTRIBUTING.md#optional-meld-integration).
+This is an early beta. The Intel build has not been tested on an Intel Mac, and real Spotify playback, trackpad gestures, external displays, AirDrop and long-running sessions need further testing. The download does not include the [optional Meld Android integration](CONTRIBUTING.md#optional-meld-integration). Beta 2 also predates the native interface and [notifications](#notifications); [build from source](#build-from-source) to use them.
 
 ## Use Lilt
 
@@ -36,13 +36,34 @@ New references expire after seven days by default. **Keep Longer** starts a new 
 
 ### Notifications
 
-Lilt shows a short banner in the notch with a picture, the sender and the text. Banners that arrive while the notch is open wait until it closes (at most five, for two minutes). Nothing is saved.
+Lilt shows a short banner in the notch with a picture, the sender and the text: Slack messages, banners from other apps such as WhatsApp, and coding agents that finished a task. A banner that arrives while the notch is open waits until it closes (up to five banners, for two minutes). Lilt keeps no notification history.
 
-- **Slack** (Settings → Notifications): **Create Slack app** opens Slack with Lilt's manifest prefilled (user scopes, Socket Mode, user message events). Install the app to your workspace, then copy the **User OAuth Token** (`xoxp-…`, OAuth & Permissions) and create an **App-Level Token** with `connections:write` (`xapp-…`, Basic Information). Paste both and choose Connect. Lilt shows direct and group messages and channel messages that mention you, with the sender's avatar. Tokens are stored only in your login Keychain. Some workspaces require an admin to approve the app.
-- **Other apps** such as WhatsApp or Messages: switch on **Other apps** and allow Lilt under System Settings → Privacy & Security → Accessibility. Lilt reads only the transient macOS banner (public Accessibility API, `com.apple.notificationcenterui`), never the Notification Center history, a database or screenshots, and shows the sending app's icon. This depends on the macOS 26 banner layout and is experimental. With the Slack app connected, Slack's system banners are skipped.
-- **Coding agents**: Claude Code (also inside T3 Code) and Codex report a finished turn with the project folder and the agent's last message. Install `scripts/agent-hook.sh` somewhere stable and add it as a Claude Code `Stop` hook (`agent-hook.sh claude`) and in front of Codex's `notify` command (`notify = ["/path/agent-hook.sh", "codex", …previous notify…]`). Set `LILT_BIN` if Lilt is not in `build/` next to the script or in `/Applications`. The hook does nothing with Lilt builds that predate `--notify`.
+**Slack.** Lilt connects through your own Slack app, which gives it names and avatars.
 
-**Preview banner** works without any permission. Dismiss, Escape or an outside click clears a banner; selecting a tab takes over the panel.
+1. In **Settings → Notifications**, choose **Create Slack app**. Slack opens with Lilt's app manifest prefilled. Create the app and install it to your workspace. Some workspaces require an admin to approve it.
+2. Under **OAuth & Permissions**, copy the **User OAuth Token** (`xoxp-…`).
+3. Under **Basic Information → App-Level Tokens**, create a token with the `connections:write` scope (`xapp-…`).
+4. Paste both into Lilt and choose **Connect**.
+
+Lilt shows direct messages, group messages and channel messages that mention you. The tokens are stored only in your login Keychain. **Disconnect** removes them.
+
+**Other apps.** Turn on **Other apps** and allow Lilt in **System Settings → Privacy & Security → Accessibility**. Lilt then mirrors the transient macOS banners of apps such as WhatsApp or Messages, with the sending app's icon. It reads only these banners through the public Accessibility API, never the Notification Center history, a database or screenshots. This relies on the macOS 26 banner layout and is experimental. While Slack is connected, Slack's own macOS banners are skipped so messages do not appear twice.
+
+**Coding agents.** Claude Code (also inside T3 Code) and Codex show the project folder and their last answer when they finish. Copy `scripts/agent-hook.sh` to a stable place, then register it:
+
+```jsonc
+// ~/.claude/settings.json
+"hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "/path/to/agent-hook.sh claude" }] }] }
+```
+
+```toml
+# ~/.codex/config.toml: put the hook in front of any existing notify command
+notify = ["/path/to/agent-hook.sh", "codex"]
+```
+
+The hook looks for Lilt in `build/` next to the script or in `/Applications`; set `LILT_BIN` in the command to use another copy. It never blocks the agent, passes Codex's message on to a previous notify command, and does nothing with Lilt versions that cannot receive agent messages. Codex reads the setting when a new session starts.
+
+**Preview banner** in settings works without any permission. Dismiss, Escape or an outside click clears a banner; choosing a tab keeps the panel open.
 
 ## Build from source
 
@@ -61,7 +82,7 @@ The command uses an ad-hoc signature. macOS permissions can need to be granted a
 
 ```sh
 swift test
-bash -n scripts/build-app.sh scripts/build-meld-bridge.sh
+bash -n scripts/build-app.sh scripts/build-meld-bridge.sh scripts/agent-hook.sh
 git diff --check
 ```
 
@@ -69,7 +90,7 @@ Automated tests and simulated players do not prove real playback, trackpad or ha
 
 ## Project
 
-AppKit owns windows, permissions, local storage and player control. The interface is native SwiftUI; Lilt loads no web content. Normal settings, timer state and file references are stored locally in `~/Library/Application Support/Lilt/`.
+AppKit owns windows, permissions, local storage and player control. The interface is native SwiftUI; Lilt loads no web content. Normal settings, timer state and file references are stored locally in `~/Library/Application Support/Lilt/`. Lilt goes online only to load album artwork that the selected player links to and, once you connect it, Slack.
 
 - [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Release process](docs/RELEASING.md)
 - [Native/UI bridge](docs/BRIDGE.md) · [Design reference](docs/REFERENCE.md) · [Feature plan](docs/FEATURE-PLAN.md)
