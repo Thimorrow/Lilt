@@ -1,0 +1,2 @@
+# Fake Slack token in a test fixture (SlackTokens validation), not a credential.
+e3b4d0f36889383d8b1c247630b7c23af82df44d:Tests/LiltTests/AgentInboxTests.swift:slack-app-token:84

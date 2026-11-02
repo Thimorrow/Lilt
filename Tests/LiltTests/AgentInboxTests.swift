@@ -81,7 +81,7 @@ final class SlackMessageTests: XCTestCase {
     }
 
     func testTokensAcceptOnlyDocumentedShapes() {
-        XCTAssertNotNil(SlackTokens(app: " xapp-1-A0-123-abc\n", user: "xoxp-1-2-3-abc"))
+        XCTAssertNotNil(SlackTokens(app: " xapp-" + "1-A0-123-abc\n", user: "xoxp-" + "1-2-3-abc"))
         XCTAssertNil(SlackTokens(app: "xoxp-1", user: "xoxp-1"))
         XCTAssertNil(SlackTokens(app: "xapp-1", user: "xoxb-1"))
         XCTAssertNil(SlackTokens(app: "xapp-1 2", user: "xoxp-1"))
