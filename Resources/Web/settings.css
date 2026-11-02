@@ -161,3 +161,12 @@ kbd{margin-left:4px;padding:2px 6px;border:1px solid var(--line-strong);border-r
 }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
 html.reduce-motion *,html.reduce-motion *::before,html.reduce-motion *::after{transition:none!important;animation:none!important}
+.shortcut-controls{display:flex;align-items:center;gap:12px}
+.shortcut-controls kbd{border:0;background:none;padding:0;font:inherit;font-size:15px;letter-spacing:.06em;min-width:80px;text-align:center}
+.shortcut-reset{border:0;background:none;color:var(--muted);font:inherit;font-size:12px;cursor:pointer;padding:8px}
+.shortcut-controls [aria-pressed=true]{border-color:var(--focus);background:var(--surface-hover)}
+.notification-permission{padding:0 20px 12px;margin:0}
+.completion-options{display:flex;align-items:center;gap:6px}
+.completion-option{min-height:32px;padding:5px 10px;border:1px solid var(--line-strong);border-radius:8px;background:transparent;color:var(--muted);font:inherit;font-size:12px;cursor:pointer}
+.completion-option[aria-checked=true]{background:var(--ink);color:var(--canvas);border-color:var(--ink)}
+.completion-option:disabled{opacity:.5;cursor:default}

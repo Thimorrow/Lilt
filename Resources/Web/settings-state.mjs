@@ -1,6 +1,6 @@
 export const MUSIC_SOURCES = Object.freeze({ spotify: 'Spotify', appleMusic: 'Apple Music', meld: 'Meld' });
 export const SETTINGS_SECTIONS = ['music', 'focus', 'shelf', 'general'];
-export const freshSettings = () => ({ musicSource: 'spotify', brainFMEnabled: false, focusMinutes: 25, focusActivity: 'deepWork', shelfShortDays: 7, shelfLongDays: 30, displayID: '', displays: [], focusSound: true, shortcutEnabled: true, openAtLogin: false, shortcutLabel: '⌃⌥L', shortcutConflict: false, displayUnavailable: false, musicBusy: false, focusLocked: false, providers: [], brainFM: { installed: false, permission: false }, error: null, saved: false, ready: false });
+export const freshSettings = () => ({ musicSource: 'spotify', brainFMEnabled: false, notificationBannersEnabled: false, notificationCaptureStatus: 'disabled', notificationCaptureMessage: 'Off. No notifications are read.', focusMinutes: 25, focusActivity: 'deepWork', shelfShortDays: 7, shelfLongDays: 30, displayID: '', displays: [], focusSound: true, focusNotificationsEnabled: false, focusNotificationStatus: 'off', shortcutEnabled: true, openAtLogin: false, shortcutLabel: '⌃⌥L', shortcutConflict: false, displayUnavailable: false, musicBusy: false, focusLocked: false, providers: [], brainFM: { installed: false, permission: false }, error: null, saved: false, ready: false });
 
 export function settingsSnapshot(value) {
   if (!value || !Object.hasOwn(MUSIC_SOURCES, value.musicSource)
@@ -13,6 +13,15 @@ export function settingsSnapshot(value) {
     || typeof value.displayID !== 'string' || !Array.isArray(value.displays) || typeof value.displayUnavailable !== 'boolean'
     || typeof value.brainFM?.installed !== 'boolean' || typeof value.brainFM?.permission !== 'boolean'
     || (value.error !== null && (typeof value.error?.code !== 'string' || typeof value.error?.message !== 'string'))) return null;
+  if (value.notificationBannersEnabled !== undefined && typeof value.notificationBannersEnabled !== 'boolean') return null;
+  if (value.notificationCaptureStatus !== undefined && !['disabled', 'diagnostic', 'suspended', 'permission', 'unsupported'].includes(value.notificationCaptureStatus)) return null;
+  if (value.notificationCaptureMessage !== undefined && typeof value.notificationCaptureMessage !== 'string') return null;
+  if (value.focusNotificationsEnabled !== undefined && typeof value.focusNotificationsEnabled !== 'boolean') return null;
+  if (value.focusNotificationStatus !== undefined && !['off', 'allowed', 'permission', 'denied', 'error', 'diagnostic'].includes(value.focusNotificationStatus)) return null;
+  if (value.focusNotificationRequesting !== undefined && typeof value.focusNotificationRequesting !== 'boolean') return null;
+  if (value.shortcut !== undefined && (!Number.isInteger(value.shortcut?.keyCode) || value.shortcut.keyCode < 0 || value.shortcut.keyCode > 127
+    || !Number.isInteger(value.shortcut?.modifiers) || value.shortcut.modifiers < 0 || value.shortcut.modifiers > 0xffffffff
+    || (value.shortcut.modifiers & ~6912) !== 0 || (value.shortcut.modifiers & 6400) === 0)) return null;
   const providers = value.providers.filter(provider => provider && Object.hasOwn(MUSIC_SOURCES, provider.id)
     && typeof provider.installed === 'boolean' && typeof provider.running === 'boolean'
     && typeof provider.availability === 'string');

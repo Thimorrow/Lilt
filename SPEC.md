@@ -14,17 +14,20 @@ Lilt is a local macOS app for music, focus and files at the screen edge. It adap
 
 - The standalone timer must work without Brain.fm. Work and break intervals are optional; the next phase starts only after explicit confirmation. Do not start music during a break or after a restart.
 - Brain.fm is optional. When enabled, use the installed app and explicitly authorized Accessibility access. Confirm the selected activity and playback before changing the associated timer state. Show uncertain states and errors.
+- Extend a running, paused or completed phase by five minutes, keeping pause state and interval presets. Total duration remains bounded to 180 minutes. Completed-phase actions include an explicit End. Optional local completion notifications require their own explicit permission action.
 - Store native timer state and deadlines. Restore the state after restart without inventing unobserved playback. Keep timer expiry visible within Lilt and do not bring another app to the foreground.
 
 ### Shelf
 
 - A scrollable list displays readable names and small image previews. More than 24 entries are supported. Text and controls must stay outside the physical notch.
+- Accept files and folders as local references. Explicit Paste/⌘V adds copied Finder items. Undo/⌘Z restores explicit removal/clear operations within the current process, without resurrecting expired references or changing originals.
 - Support single and multiple selection by mouse and keyboard. Provide contextual preview, open, Finder, sharing, group drag and removal actions. Removing or expiring a reference never moves or deletes the original file.
 - New references receive the current short retention period, initially seven days. Explicitly keeping an item longer starts the current long period, initially 30 days. Changing a default does not alter existing deadlines. References created before expiry was introduced remain until removed.
 - Acceptance requires isolated files, scrolling beyond 24 entries, selection and actions, retention changes, expiry and restart. Compare originals before and after. Report native drag/sharing and human design review separately.
 
 ### Settings and display
 
+- The global shortcut is freely recordable with Control, Option or Command. Persist the confirmed combination; rejected or conflicting changes retain the previous binding.
 - Settings open from the gear, menu or ⌘,. Persist confirmed player source, focus defaults, optional Brain.fm, Shelf retention and display choice. Retain the current settings redesign, keyboard access and reduced-motion behavior.
 - Automatic display selection prefers a physical notch, then the main display. If an explicitly selected display disconnects, temporarily fall back and restore the selection when it returns.
 - Keep the selected compact view across open and close. A running or completed focus session must not replace an explicitly selected Music or Shelf view. Empty panel areas, outside clicks and Escape close the panel; interactive controls stay usable.
@@ -35,6 +38,7 @@ Lilt is a local macOS app for music, focus and files at the screen edge. It adap
 - Trackpad swipes move between neighboring views. Preserve vertical Shelf scrolling, horizontal scrollable content, file drag, clicks and keyboard navigation. Do not wrap at either end. Respect the system scroll direction and reduced motion.
 - During a swipe, current and neighboring views follow a shared position. A short gesture returns to its starting view; direction changes and interruption must not jump. The tab indicator follows that position.
 - Existing click-driven tab transitions remain interruptible. Keyboard navigation and reduced motion switch immediately. Preserve the existing shape animation, black background and Play alignment between Music and Focus.
+- Clicking next to a dropdown dismisses only that dropdown. A later blank/outside click may fold Lilt. Keep the source open throughout an outgoing file drag and offer only Copy.
 - Dropdowns use an interruptible scale and opacity transition anchored at the trigger. Opening uses 200 ms and `cubic-bezier(.23,1,.32,1)`; closing uses 150 ms and `ease-in`. The menu becomes inaccessible immediately on close. Keyboard and reduced-motion paths switch directly.
 
 ## Verification

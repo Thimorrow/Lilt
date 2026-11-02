@@ -16,7 +16,7 @@ This is an early beta. The Intel build has not been tested on an Intel Mac, and 
 
 ## Use Lilt
 
-Click the compact notch or press ⌃⌥L from any app to open it. Use the Music, Focus and Shelf tabs, or swipe horizontally on a trackpad. Click outside Lilt, an empty part of the open panel, or press Escape to close it. Click the gear, use the menu-bar icon, or press ⌘, to open settings. **General** controls the display, opening at login and the shortcut.
+Click the compact notch or press your keyboard shortcut (⌃⌥L by default) from any app to open it. Use the Music, Focus and Shelf tabs, or swipe horizontally on a trackpad. Click outside Lilt, an empty part of the open panel, or press Escape to close it. Click the gear, use the menu-bar icon, or press ⌘, to open settings. **General** controls the display, opening at login and the shortcut. Click the shortcut to record a new combination; Escape cancels. A conflicting combination leaves the previous shortcut in place.
 
 ### Music
 
@@ -24,15 +24,21 @@ Choose Spotify or Apple Music in settings, install and open that Mac app, and se
 
 ### Focus
 
-Focus works as a standalone timer. Click the time to choose a preset, a custom duration or work and break intervals. Each interval transition requires you to start the next phase. A sound plays when time is up; turn it off in settings. A running timer continues while the notch is closed and restores its deadline after an app restart.
+Focus works as a standalone timer. Click the time to choose a preset, a custom duration or work and break intervals. Each interval transition requires you to start the next phase. When time is up, choose the next interval, add **+5** minutes or **End** the session. **+5** also extends a running or paused timer; paused timers stay paused. A sound plays when time is up; turn it off in settings. **Notification** under **When time is up** separately enables a macOS notification after you explicitly grant permission. A running timer continues while the notch is closed and restores its deadline after an app restart.
 
 Brain.fm is optional and disabled on new installations. When enabled, Lilt controls the separately installed Brain.fm app using macOS Accessibility permission. Lilt confirms playback before starting the associated work timer. A break does not start music automatically. If Lilt is fully closed at the end of a session, it cannot pause Brain.fm until it runs again.
 
 ### Shelf
 
-Drag files into Shelf or use **Add**. Lilt stores local references, not copies. Select multiple files with ⌘-click or a range with ⇧-click. The context menu provides preview, open and Finder actions for a single file, and sharing, longer retention and removal for a selection. Selected files can be dragged out together.
+Drag files or folders into Shelf, use **Add**, or copy them in Finder and press **⌘V** in Shelf. **Paste** provides the same action. Lilt stores local references, not copies. Select multiple files with ⌘-click or a range with ⇧-click. The context menu provides preview, open and Finder actions for a single file, and sharing, longer retention and removal for a selection. Selected files and folders can be dragged out together. **⌘Z** or **Undo** restores removed entries, including a cleared Shelf, until Lilt quits. Expired entries stay expired; original files are never restored or modified by Undo.
 
 New references expire after seven days by default. **Keep Longer** starts a new 30-day period. Both defaults can be changed in settings; changes do not alter existing deadlines. Removing or expiring a reference never deletes the original file. Older entries without a deadline remain until removed.
+
+### Experimental notification banners
+
+In **Settings → General**, notification banners are explicitly opt-in and off by default, independently of Brain.fm Accessibility access. **Preview synthetic banner** works without capture permission. It shows one temporary plaintext banner using the existing notch animation; Dismiss, Escape or an outside click clears it. Selecting a tab takes over the panel without an expiry closing it.
+
+Real capture is currently blocked by an **unsupported/unverified Notification Center layout**. Lilt does not read notification content or history. Opening Accessibility settings is a separate explicit action and does not establish layout support. The intended capture target is only `com.apple.notificationcenterui`, using public Accessibility APIs, with no database, private API, Full Disk Access or screenshots. Diagnostic/smoke runs never capture, request notification permissions or open permission settings, even with opt-in saved. Session inactivity and sleep suspend the owner; complete lock-screen safety is not verified.
 
 ## Build from source
 
@@ -51,7 +57,7 @@ The command uses an ad-hoc signature. macOS permissions can need to be granted a
 
 ```sh
 swift test
-node --test scripts/test-ui.mjs scripts/test-focus.mjs scripts/test-settings.mjs
+node --test scripts/test-ui.mjs scripts/test-focus.mjs scripts/test-settings.mjs scripts/test-notifications.mjs
 bash -n scripts/build-app.sh scripts/build-meld-bridge.sh
 git diff --check
 ```

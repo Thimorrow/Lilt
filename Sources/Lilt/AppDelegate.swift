@@ -6,12 +6,20 @@ import CoreFoundation
 import ServiceManagement
 
 final class NotchPanel: NSPanel {
-    override var canBecomeKey: Bool { true }
+    var permitsKey = true
+    override var canBecomeKey: Bool { permitsKey }
     override var canBecomeMain: Bool { false }
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+    let notificationOwner = NotificationBannerOwner()
+    let notificationPoller = NotificationPoller()
+    var notificationStatus = NotificationCaptureStatus.disabled
+    var notificationSessionActive = true
+    var notificationSleeping = false
+    var notificationObservers: [NSObjectProtocol] = []
+    var notificationTimer: Timer?
     var panel: NotchPanel!
     var webView: NotchWebView!
     var statusItem: NSStatusItem!
@@ -25,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var wakeObserver: NSObjectProtocol?
     var sleepObserver: NSObjectProtocol?
     var focus: FocusCoordinator!
+    var focusNotifications: FocusNotifications?
     var shelf: ShelfStore!
     var music: MusicCoordinator!
     var settings: SettingsStore!
@@ -40,13 +49,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let meld = MeldController()
     let simulatedMusic = SimulatedMeld()
     var previewURL: URL?
+    var diagnosticShelfPasteboard: NSPasteboard?
+    var shelfDragRegions: [(id: String, frame: CGRect)] = []
+    var shelfDragSelection: [String] = []
     let simulatedPlayer = SimulatedBrainFM()
     var geometry: NotchGeometry!
     var surfaceRect = CGRect.zero
     var surfaceRadius: CGFloat = 28
     var isOpen = false
+    var selectedView = "music"
+    var openFocusOnReady = false
     var ready = false
     var selectingFiles = false
+    var outsideInteractionInFlight = false
+    var panelInteractionRevision = 0
     var lastDiagnosticID = ""
     var resourceDirectory: URL!
     let brainFM = BrainFMController()
@@ -70,6 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var simulatedMeld: Bool { diagnosticDirectory != nil && CommandLine.arguments.contains("--simulate-meld") }
 
     var simulated: Bool { diagnosticDirectory != nil && CommandLine.arguments.contains("--simulate-brainfm") }
+    var desktopInputIsolated: Bool { diagnosticDirectory != nil && CommandLine.arguments.contains("--isolate-desktop-input") }
 
     func makeStores() {
         let settingsFile = dataDirectory.appendingPathComponent("settings.json")
@@ -98,14 +115,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self.shelf.pruneExpired()
             if previous != self.shelf.entries.map(\.id) { self.sendShelf() }
         }
+        timer.tolerance = 5
         RunLoop.main.add(timer, forMode: .common)
         shelfTimer = timer
         focus.onChange = { [weak self] in
-            guard let self, self.ready else { return }
+            guard let self else { return }
+            self.configureFocusNotifications()
+            guard self.ready else { return }
             self.send("receiveFocusSnapshot", value: self.focus.snapshot)
             self.sendSettings()
         }
         focus.onComplete = { [weak self] in self?.playFocusSignal() }
+        if !isolatedRun {
+            focusNotifications = FocusNotifications()
+            focusNotifications?.onChange = { [weak self] in
+                self?.configureFocusNotifications()
+                self?.sendSettings()
+            }
+            focusNotifications?.onOpen = { [weak self] in
+                guard let self else { return }
+                if !self.ready { self.openFocusOnReady = true; return }
+                self.send("setView", value: "focus")
+                self.setOpen(true)
+                self.panel.makeKey()
+            }
+            focusNotifications?.refreshAuthorization()
+        }
         focus.startObserving()
         music = MusicCoordinator(player: self.player(for: settings.value.musicSource))
         music.onChange = { [weak self] in
@@ -129,21 +164,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         applyShortcut()
         observeScreen()
         installWakeObservers()
-        pointerMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .rightMouseDown, .leftMouseDragged, .rightMouseDragged]) { [weak self] event in
+        installNotificationBanners()
+        pointerMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .leftMouseUp, .rightMouseDown, .leftMouseDragged, .rightMouseDragged]) { [weak self] event in
             guard let self else { return }
+            guard !self.desktopInputIsolated else { return }
+            if event.type == .leftMouseUp { self.webView.endMouseSequence() }
             self.updateMousePassthrough()
             if event.type == .leftMouseDown || event.type == .rightMouseDown {
-                if self.isOpen, !self.selectingFiles, !self.hitSurface(NSEvent.mouseLocation) { self.setOpen(false) }
+                guard NSScreen.screens.contains(where: { $0.frame.contains(NSEvent.mouseLocation) }) else { return }
+                if self.isOpen, !self.selectingFiles, !self.hitSurface(NSEvent.mouseLocation) { self.dismissMenusOrClose() }
             }
         }
-        localPointerMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .leftMouseDragged, .rightMouseDragged, .scrollWheel]) { [weak self] event in
+        localPointerMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .leftMouseUp, .leftMouseDragged, .rightMouseDragged, .scrollWheel]) { [weak self] event in
             self?.updateMousePassthrough()
+            if event.type == .leftMouseUp { self?.webView.endMouseSequence() }
+            if event.type == .leftMouseDragged, self?.webView.beginShelfDrag(with: event) == true { return nil }
             if event.type == .scrollWheel, let self, self.isOpen, !self.selectingFiles, event.window === self.panel {
                 self.webView.observeScrollWheel(event)
             }
             if event.type == .leftMouseDown {
-                if event.window === self?.panel { self?.webView.recordMouseDown(event) }
-                else if self?.isOpen == true, self?.selectingFiles == false { self?.setOpen(false) }
+                if event.window === self?.panel {
+                    if let view = self?.webView, !view.bounds.contains(view.convert(event.locationInWindow, from: nil)) { return nil }
+                    self?.panel.permitsKey = true
+                    self?.webView.recordMouseDown(event)
+                }
+                else if self?.isOpen == true, self?.selectingFiles == false { self?.dismissMenusOrClose() }
             }
             return event
         }
@@ -257,6 +302,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         webView.setValue(false, forKey: "drawsBackground")
         webView.registerForDraggedTypes([.fileURL])
         webView.onFiles = { [weak self] urls in self?.addFiles(urls) }
+        webView.onShelfKeyCommand = { [weak self] command in
+            guard let self, self.isOpen, self.selectedView == "shelf" else { return false }
+            self.shelfAction(["command": command])
+            return true
+        }
+        webView.onShelfDragStarted = { [weak self] ids in self?.send("selectShelfDrag", value: ids) }
+        webView.onShelfMouseDown = { [weak self] point in self?.prepareShelfDrag(at: point) }
         webView.onTabSwipeProgress = { [weak self] phase, dx, dy, accepted, point in
             guard let self, self.ready, self.isOpen, !self.selectingFiles,
                   point.x.isFinite, point.y.isFinite, dx.isFinite, dy.isFinite else { return }
@@ -322,11 +374,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func installWakeObservers() {
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.notificationSleeping = false
+            self?.configureNotificationBanners()
             self?.focus.recheck()
             self?.music.recheck()
             self?.sendShelf()
+            self?.focusNotifications?.refreshAuthorization()
         }
         sleepObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.notificationSleeping = true
+            self?.configureNotificationBanners()
             self?.focus.checkpoint()
         }
     }
@@ -349,13 +406,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func setOpen(_ value: Bool) {
         guard ready else { return }
+        if !value, webView.isDraggingShelfFiles { return }
+        panelInteractionRevision += 1
+        notificationInteraction(keepOpen: value)
         isOpen = value
         send("setOpen", value: value)
-        if value { panel.orderFrontRegardless() }
-        else { panel.resignKey() }
+        if value { music.recheck(); panel.orderFrontRegardless() }
+        else if panel.isKeyWindow { panel.resignKey() }
     }
 
-    @objc func togglePanel() { setOpen(!isOpen) }
+    @objc func togglePanel() { setOpen(notificationOwner.visible != nil || !isOpen) }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         showSettings()
@@ -364,7 +424,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func windowDidResignKey(_ notification: Notification) {
         guard ready, isOpen, !selectingFiles, !smokeTest, diagnosticDirectory == nil else { return }
-        setOpen(false)
+        dismissMenusOrClose()
+    }
+
+    func dismissMenusOrClose() {
+        guard ready, isOpen, !selectingFiles, !webView.isDraggingShelfFiles, !outsideInteractionInFlight else { return }
+        outsideInteractionInFlight = true
+        let revision = panelInteractionRevision
+        webView.evaluateJavaScript("window.Lilt?.dismissMenus()") { [weak self] value, _ in
+            guard let self else { return }
+            if value as? Bool != true, revision == self.panelInteractionRevision { self.setOpen(false) }
+            DispatchQueue.main.async { self.outsideInteractionInFlight = false }
+        }
     }
 
     @objc func selectView(_ item: NSMenuItem) {
@@ -405,6 +476,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let candidates = displayCandidates().map { $0.1 }
         snapshot["displays"] = candidates.filter { UUID(uuidString: $0.id) != nil }.map { ["id": $0.id, "name": $0.name] }
         snapshot["displayUnavailable"] = DisplaySelection.resolve(candidates, preferredID: settings.value.displayID)?.preferredUnavailable ?? false
+        snapshot["notificationCaptureStatus"] = notificationStatus.rawValue
+        snapshot["notificationCaptureMessage"] = notificationStatus.message
         snapshot["brainFMEnabled"] = focus.brainFMEnabled
         snapshot["musicBusy"] = music?.pending != nil
         snapshot["focusLocked"] = focus.integrationLocked
@@ -412,8 +485,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         snapshot["error"] = (settingsError ?? settings.error).map(\.payload) as Any? ?? NSNull()
         snapshot["saved"] = settingsError == nil && settings.error == nil
         snapshot["openAtLogin"] = openAtLogin
-        snapshot["shortcutLabel"] = GlobalShortcut.label
+        snapshot["shortcutLabel"] = settings.value.shortcut.label
         snapshot["shortcutConflict"] = shortcutConflict
+        snapshot["focusNotificationStatus"] = isolatedRun ? "diagnostic" : focusNotifications?.status ?? "off"
+        snapshot["focusNotificationRequesting"] = focusNotifications?.requestingPermission ?? false
         snapshot["providers"] = MusicSource.allCases.map { source -> [String: Any] in
             let controller: DirectMusicController? = source == .spotify ? spotify : source == .appleMusic ? appleMusic : nil
             let selected = source == settings.value.musicSource
@@ -473,8 +548,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let focusChanged = value.brainFMEnabled != focus.brainFMEnabled || value.focusMinutes != settings.value.focusMinutes || value.focusActivity != settings.value.focusActivity
             if sourceChanged, music.pending != nil { throw SettingsError.musicBusy }
             if focusChanged, focus.integrationLocked { throw SettingsError.focusBusy }
-            guard settings.save(value) else { settingsError = settings.error; sendSettings(); return }
+            let previous = settings.value
+            let shortcutChanged = value.shortcut != previous.shortcut || value.shortcutEnabled != previous.shortcutEnabled
+            if shortcutChanged, shortcut?.setEnabled(value.shortcutEnabled, shortcut: value.shortcut) == false { throw SettingsError.shortcutConflict }
+            guard settings.save(value) else {
+                if shortcutChanged { _ = shortcut?.setEnabled(previous.shortcutEnabled, shortcut: previous.shortcut) }
+                settingsError = settings.error; sendSettings(); return
+            }
             settingsError = nil
+            configureNotificationBanners()
+            configureFocusNotifications()
             if displayChanged {
                 geometry = currentGeometry()
                 panel.setFrame(geometry.panelFrame, display: true)
@@ -604,9 +687,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applyShortcut() {
         if shortcut == nil, !isolatedRun { shortcut = GlobalShortcut { [weak self] in self?.toggleFromShortcut() } }
-        shortcutConflict = !(shortcut?.setEnabled(settings.value.shortcutEnabled) ?? true)
-        toggleItem?.keyEquivalent = settings.value.shortcutEnabled && !shortcutConflict ? "l" : ""
-        toggleItem?.keyEquivalentModifierMask = [.control, .option]
+        shortcutConflict = !(shortcut?.setEnabled(settings.value.shortcutEnabled, shortcut: settings.value.shortcut) ?? true)
+        toggleItem?.keyEquivalent = ""
     }
 
     func toggleFromShortcut() {

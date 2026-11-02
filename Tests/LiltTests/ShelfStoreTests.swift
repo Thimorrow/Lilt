@@ -146,4 +146,99 @@ final class ShelfStoreTests: XCTestCase {
         let items = try XCTUnwrap(shelf.snapshot["items"] as? [[String: Any]])
         XCTAssertTrue(items.allSatisfy { $0["thumbnail"] == nil })
     }
+
+    func testFolderReferencesPersistAndRemovalNeverTouchesNestedContents() throws {
+        let nested = try fixture("project.png/nested/original.txt", content: "nested original")
+        let directory = folder.appendingPathComponent("project.png")
+        let shelf = ShelfStore(file: state)
+        shelf.add([directory, directory])
+        XCTAssertEqual(shelf.entries.count, 1)
+        let restored = ShelfStore(file: state)
+        let id = try XCTUnwrap(restored.entries.first?.id)
+        XCTAssertEqual(restored.resolvedURL(for: id), directory.standardizedFileURL.resolvingSymlinksInPath())
+        let item = try XCTUnwrap((restored.snapshot["items"] as? [[String: Any]])?.first)
+        XCTAssertEqual(item["kind"] as? String, "FOLDER")
+        XCTAssertNil(item["thumbnail"])
+        restored.remove(id)
+        restored.undoRemoval()
+        restored.clear()
+        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.path))
+        XCTAssertEqual(try String(contentsOf: nested, encoding: .utf8), "nested original")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path), ["nested"])
+    }
+
+    func testUndoMultipleRemovalRestoresIDsOrderAndPreservesLaterAdditions() throws {
+        let urls = try (0..<5).map { try fixture("\($0).txt") }
+        let shelf = ShelfStore(file: state)
+        shelf.add(Array(urls.prefix(4)))
+        let original = shelf.entries
+        shelf.remove([original[0].id, original[2].id])
+        shelf.add([urls[4]])
+        let added = try XCTUnwrap(shelf.entries.last)
+        XCTAssertTrue(shelf.canUndoRemoval)
+        shelf.undoRemoval()
+        XCTAssertEqual(shelf.entries, original + [added])
+        XCTAssertEqual(ShelfStore(file: state).entries, shelf.entries)
+        XCTAssertFalse(shelf.canUndoRemoval)
+        XCTAssertTrue(urls.allSatisfy { (try? Data(contentsOf: $0)) == Data("original".utf8) })
+    }
+
+    func testUndoClearSupportsSuccessiveRemovalsWithoutPersistingHistory() throws {
+        let urls = try (0..<3).map { try fixture("\($0).txt") }
+        let shelf = ShelfStore(file: state)
+        shelf.add(urls)
+        let original = shelf.entries
+        shelf.remove(original[1].id)
+        shelf.clear()
+        XCTAssertTrue(shelf.entries.isEmpty)
+        XCTAssertFalse(ShelfStore(file: state).canUndoRemoval)
+        shelf.undoRemoval()
+        XCTAssertEqual(shelf.entries.map(\.id), [original[0].id, original[2].id])
+        shelf.undoRemoval()
+        XCTAssertEqual(shelf.entries, original)
+        XCTAssertFalse(shelf.canUndoRemoval)
+    }
+
+    func testUndoSkipsExpiredRemovedEntriesAndKeepsOrderAfterOtherExpiry() throws {
+        let urls = try (0..<4).map { try fixture("\($0).txt") }
+        var clock = Date(timeIntervalSince1970: 1_700_000_000)
+        let shelf = ShelfStore(file: state, now: { clock })
+        shelf.add([urls[0]], retentionDays: 1)
+        shelf.add([urls[1]], retentionDays: 1)
+        shelf.add([urls[2], urls[3]], retentionDays: 7)
+        let original = shelf.entries
+        shelf.remove([original[0].id, original[2].id])
+        clock.addTimeInterval(2 * 86_400)
+        shelf.undoRemoval()
+        XCTAssertEqual(shelf.entries.map(\.id), [original[2].id, original[3].id])
+        XCTAssertFalse(shelf.canUndoRemoval)
+        shelf.pruneExpired()
+        XCTAssertFalse(shelf.canUndoRemoval)
+    }
+
+    func testUndoDoesNotDuplicateReaddedReference() throws {
+        let url = try fixture("same.txt")
+        let shelf = ShelfStore(file: state)
+        shelf.add([url])
+        let removedID = try XCTUnwrap(shelf.entries.first?.id)
+        shelf.remove(removedID)
+        shelf.add([url])
+        let addedID = try XCTUnwrap(shelf.entries.first?.id)
+        shelf.undoRemoval()
+        XCTAssertEqual(shelf.entries.map(\.id), [addedID])
+        XCTAssertNotEqual(removedID, addedID)
+    }
+
+    func testUndoHistoryIsBoundedAndNoOpRemovalDoesNotReplaceIt() throws {
+        let urls = try (0..<21).map { try fixture("\($0).txt") }
+        let shelf = ShelfStore(file: state)
+        shelf.add(urls)
+        let original = shelf.entries
+        for entry in original { shelf.remove(entry.id) }
+        shelf.remove("unknown")
+        shelf.clear()
+        for _ in 0..<20 { shelf.undoRemoval() }
+        XCTAssertEqual(shelf.entries.map(\.id), Array(original.dropFirst()).map(\.id))
+        XCTAssertFalse(shelf.canUndoRemoval)
+    }
 }

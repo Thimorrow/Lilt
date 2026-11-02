@@ -4,6 +4,7 @@ import CoreFoundation
 struct LiltSettings: Codable, Equatable {
     var musicSource: MusicSource = .spotify
     var brainFMEnabled = false
+    var notificationBannersEnabled = false
     var focusMinutes = 25
     var focusActivity: FocusActivity = .deepWork
     var shelfShortDays = 7
@@ -11,17 +12,21 @@ struct LiltSettings: Codable, Equatable {
     var displayID = ""
     var focusSound = true
     var shortcutEnabled = true
+    var shortcut = KeyboardShortcut()
+    var focusNotificationsEnabled = false
 
     var payload: [String: Any] {
         ["musicSource": musicSource.rawValue, "sourceName": musicSource.title,
-         "brainFMEnabled": brainFMEnabled, "focusMinutes": focusMinutes,
+         "notificationBannersEnabled": notificationBannersEnabled, "brainFMEnabled": brainFMEnabled, "focusMinutes": focusMinutes,
          "focusActivity": focusActivity.rawValue, "shelfShortDays": shelfShortDays,
          "shelfLongDays": shelfLongDays, "displayID": displayID,
-         "focusSound": focusSound, "shortcutEnabled": shortcutEnabled]
+         "focusSound": focusSound, "shortcutEnabled": shortcutEnabled,
+         "shortcut": ["keyCode": shortcut.keyCode, "modifiers": shortcut.modifiers],
+         "focusNotificationsEnabled": focusNotificationsEnabled]
     }
 
     func applying(_ changes: [String: Any]) throws -> Self {
-        let allowed: Set<String> = ["musicSource", "brainFMEnabled", "focusMinutes", "focusActivity", "shelfShortDays", "shelfLongDays", "displayID", "focusSound", "shortcutEnabled"]
+        let allowed: Set<String> = ["musicSource", "notificationBannersEnabled", "brainFMEnabled", "focusMinutes", "focusActivity", "shelfShortDays", "shelfLongDays", "displayID", "focusSound", "shortcutEnabled", "shortcut", "focusNotificationsEnabled"]
         guard !changes.isEmpty, Set(changes.keys).isSubset(of: allowed) else { throw SettingsError.invalid }
         var result = self
         if let value = changes["displayID"] {
@@ -32,11 +37,25 @@ struct LiltSettings: Codable, Equatable {
             guard let raw = value as? String, let source = MusicSource(rawValue: raw) else { throw SettingsError.invalid }
             result.musicSource = source
         }
-        for key in ["brainFMEnabled", "focusSound", "shortcutEnabled"] {
+        if let value = changes["shortcut"] {
+            guard let value = value as? [String: Any], Set(value.keys) == ["keyCode", "modifiers"] else { throw SettingsError.invalidShortcut }
+            func integer(_ key: String) throws -> UInt32 {
+                guard let number = value[key] as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+                      number.doubleValue.isFinite, number.doubleValue.rounded() == number.doubleValue,
+                      number.doubleValue >= 0, number.doubleValue <= Double(UInt32.max) else { throw SettingsError.invalidShortcut }
+                return number.uint32Value
+            }
+            let shortcut = try KeyboardShortcut(keyCode: integer("keyCode"), modifiers: integer("modifiers"))
+            guard shortcut.isValid else { throw SettingsError.invalidShortcut }
+            result.shortcut = shortcut
+        }
+        for key in ["notificationBannersEnabled", "brainFMEnabled", "focusSound", "shortcutEnabled", "focusNotificationsEnabled"] {
             if let value = changes[key] {
                 guard let number = value as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else { throw SettingsError.invalid }
-                if key == "brainFMEnabled" { result.brainFMEnabled = number.boolValue }
+                if key == "notificationBannersEnabled" { result.notificationBannersEnabled = number.boolValue }
+                else if key == "brainFMEnabled" { result.brainFMEnabled = number.boolValue }
                 else if key == "focusSound" { result.focusSound = number.boolValue }
+                else if key == "focusNotificationsEnabled" { result.focusNotificationsEnabled = number.boolValue }
                 else { result.shortcutEnabled = number.boolValue }
             }
         }
@@ -66,6 +85,8 @@ struct LiltSettings: Codable, Equatable {
 extension LiltSettings {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        notificationBannersEnabled = container.contains(.notificationBannersEnabled)
+            ? try container.decode(Bool.self, forKey: .notificationBannersEnabled) : false
         musicSource = try container.decode(MusicSource.self, forKey: .musicSource)
         brainFMEnabled = try container.decode(Bool.self, forKey: .brainFMEnabled)
         focusMinutes = try container.decode(Int.self, forKey: .focusMinutes)
@@ -75,6 +96,8 @@ extension LiltSettings {
         displayID = try container.decodeIfPresent(String.self, forKey: .displayID) ?? ""
         focusSound = try container.decodeIfPresent(Bool.self, forKey: .focusSound) ?? true
         shortcutEnabled = try container.decodeIfPresent(Bool.self, forKey: .shortcutEnabled) ?? true
+        shortcut = container.contains(.shortcut) ? try container.decode(KeyboardShortcut.self, forKey: .shortcut) : KeyboardShortcut()
+        focusNotificationsEnabled = try container.decodeIfPresent(Bool.self, forKey: .focusNotificationsEnabled) ?? false
     }
 }
 
@@ -87,6 +110,8 @@ struct SettingsError: Error, Equatable {
     static let loginItem = Self(code: "login_item", message: "Lilt could not change its login item. Move Lilt to Applications and try again.")
     static let loginApproval = Self(code: "login_approval", message: "Allow Lilt in System Settings → General → Login Items.")
     static let focusBusy = Self(code: "focus_busy", message: "End or reset your focus session before changing its defaults or Brain.fm connection.")
+    static let invalidShortcut = Self(code: "invalid_shortcut", message: "Choose a key with Control, Option or Command.")
+    static let shortcutConflict = Self(code: "shortcut_conflict", message: "Another app uses this shortcut. Your previous shortcut is unchanged.")
     var payload: [String: String] { ["code": code, "message": message] }
 }
 
@@ -109,7 +134,8 @@ final class SettingsStore {
         do {
             let saved = try JSONDecoder().decode(LiltSettings.self, from: Data(contentsOf: file))
             guard (1...180).contains(saved.focusMinutes), (1...3650).contains(saved.shelfShortDays),
-                  (1...3650).contains(saved.shelfLongDays), saved.displayID.isEmpty || UUID(uuidString: saved.displayID) != nil else { throw SettingsError.invalid }
+                  (1...3650).contains(saved.shelfLongDays), saved.shortcut.isValid,
+                  saved.displayID.isEmpty || UUID(uuidString: saved.displayID) != nil else { throw SettingsError.invalid }
             value = saved
         } catch {
             self.error = SettingsError(code: "settings_read", message: "Saved settings could not be read. Choose your settings again to save a new configuration.")
@@ -119,7 +145,8 @@ final class SettingsStore {
     @discardableResult
     func save(_ value: LiltSettings) -> Bool {
         guard (1...180).contains(value.focusMinutes), (1...3650).contains(value.shelfShortDays),
-              (1...3650).contains(value.shelfLongDays), value.displayID.isEmpty || UUID(uuidString: value.displayID) != nil else { error = .invalid; return false }
+              (1...3650).contains(value.shelfLongDays), value.shortcut.isValid,
+              value.displayID.isEmpty || UUID(uuidString: value.displayID) != nil else { error = .invalid; return false }
         do {
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
             try JSONEncoder().encode(value).write(to: file, options: .atomic)

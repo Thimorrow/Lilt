@@ -6,6 +6,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, WKSc
     var onAction: (([String: Any]) -> Void)?
     var onReady: (() -> Void)?
     private(set) var ready = false
+    private var shortcutMonitor: Any?
 
     init(resources: URL) {
         let config = WKWebViewConfiguration()
@@ -42,6 +43,42 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, WKSc
         window?.makeFirstResponder(webView)
         if ready { onReady?() }
     }
+
+    func beginShortcutRecording() {
+        endShortcutRecording()
+        send("receiveShortcutRecording", value: ["recording": true])
+        shortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, event.window === self.window else { return event }
+            return self.recordShortcutKey(event) ? nil : event
+        }
+    }
+
+    func recordShortcutKey(_ event: NSEvent) -> Bool {
+        guard shortcutMonitor != nil else { return false }
+        if event.keyCode == 53 || event.keyCode == 48 {
+            endShortcutRecording()
+            return event.keyCode != 48
+        }
+        let shortcut = KeyboardShortcut(event: event)
+        guard shortcut.isValid else {
+            send("receiveShortcutRecording", value: ["recording": true, "error": SettingsError.invalidShortcut.message])
+            return true
+        }
+        endShortcutRecording()
+        onAction?(["action": "settingsUpdate", "changes": ["shortcut": ["keyCode": shortcut.keyCode, "modifiers": shortcut.modifiers]]])
+        return true
+    }
+
+    func endShortcutRecording() {
+        guard let shortcutMonitor else { return }
+        NSEvent.removeMonitor(shortcutMonitor)
+        self.shortcutMonitor = nil
+        send("receiveShortcutRecording", value: ["recording": false])
+        onAction?(["action": "shortcutRecordingEnded"])
+    }
+
+    func windowWillClose(_ notification: Notification) { endShortcutRecording() }
+    func windowDidResignKey(_ notification: Notification) { endShortcutRecording() }
 
     func send(_ method: String, value: Any) {
         guard ready, let data = try? JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed]),

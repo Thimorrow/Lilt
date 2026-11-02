@@ -12,6 +12,30 @@ final class SettingsStoreTests: XCTestCase {
 
     override func tearDownWithError() throws { try FileManager.default.removeItem(at: directory) }
 
+    func testNotificationConsentDefaultsMigratesValidatesAndPersists() throws {
+        XCTAssertFalse(SettingsStore(file: file).value.notificationBannersEnabled)
+        try Data("""
+        {"musicSource":"spotify","brainFMEnabled":true,"focusMinutes":25,"focusActivity":"deepWork"}
+        """.utf8).write(to: file)
+        let store = SettingsStore(file: file)
+        XCTAssertFalse(store.value.notificationBannersEnabled)
+        let enabled = try store.value.applying(["notificationBannersEnabled": true])
+        XCTAssertTrue(store.save(enabled))
+        XCTAssertTrue(SettingsStore(file: file).value.notificationBannersEnabled)
+        XCTAssertTrue(enabled.brainFMEnabled)
+        XCTAssertEqual(enabled.payload["notificationBannersEnabled"] as? Bool, true)
+        for value: Any in [1, 0, "true", NSNull()] {
+            XCTAssertThrowsError(try enabled.applying(["notificationBannersEnabled": value]))
+        }
+        var saved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(enabled)) as? [String: Any])
+        for invalid: Any in [1, "true", NSNull()] {
+            saved["notificationBannersEnabled"] = invalid
+            try JSONSerialization.data(withJSONObject: saved).write(to: file)
+            XCTAssertFalse(SettingsStore(file: file).value.notificationBannersEnabled)
+            XCTAssertNotNil(SettingsStore(file: file).error)
+        }
+    }
+
     func testNewInstallUsesIndependentFocusAndDirectMusicWithoutWriting() {
         let store = SettingsStore(file: file)
         XCTAssertEqual(store.value.musicSource, .spotify)

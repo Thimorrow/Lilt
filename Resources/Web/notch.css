@@ -37,14 +37,17 @@ svg { display: block; }
 .notch-wings .wing{overflow:hidden}
 .notch.hardware-unknown .notch-compact .wing,.notch.hardware-unknown .notch-wings{visibility:hidden}
 .notch.hardware-height-unknown .notch-panel,.notch.hardware-height-unknown .notch-panel *,.notch.hardware-height-unknown .notch-compact .wing{visibility:hidden !important}
-.notch-panel{position:absolute;inset:0;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:calc(var(--hd) / var(--k)) 1fr auto;padding:0 18px 10px;overflow:clip;transition:opacity 220ms linear 120ms,filter 320ms var(--ease-out) 120ms}
-.notch[data-state=compact] .notch-panel{opacity:0;visibility:hidden;filter:blur(6px);transition:opacity 120ms linear,filter 120ms linear,visibility 0s linear 120ms}
+/* Only the shell morphs; text and controls keep their final layout throughout. */
+.notch-clip{position:absolute;inset:0;overflow:clip;border-radius:inherit;contain:layout paint}
+.notch[data-state=compact] .notch-clip{pointer-events:none}
+.notch-panel{position:absolute;top:0;left:50%;width:calc(var(--open-w) / var(--k));height:calc(var(--open-h) / var(--k));transform:translateX(-50%);display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:calc(var(--hd) / var(--k)) 1fr auto;padding:0 18px 10px;overflow:clip;transition:opacity 220ms linear 120ms}
+.notch[data-state=compact] .notch-panel{opacity:0;visibility:hidden;transition:opacity 120ms linear,visibility 0s linear 120ms}
 .notch-wings{grid-area:1 / 1;display:flex;justify-content:space-between;align-items:center;min-width:0}
 .notch-wings .wing{width:calc((100% - var(--hw) / var(--k)) / 2 - 8px)}
 .view{grid-area:2 / 1;display:grid;align-items:center;min-width:0;min-height:0;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(2px) scale(.99);transform-origin:center;transition:transform 140ms var(--ease-out),opacity 70ms linear,visibility 0s linear 140ms}
 .view[data-position=active]{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0) scale(1);transition:transform 200ms var(--ease-out) 70ms,opacity 160ms var(--ease-out) 70ms,visibility 0s}
 .notch.instant-view .view,.notch.instant-view .tabs::before{transition:none}
-.notch.swiping .view{pointer-events:none}
+.notch.swiping .view{pointer-events:none;transition:none;will-change:transform,opacity}
 .notch.swiping .tabs::before{transition:none}
 .music,.focus{grid-template-rows:54px 18px;row-gap:10px;align-content:center}
 .music{grid-template-columns:54px minmax(0,1fr) auto;column-gap:14px}
@@ -113,6 +116,7 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
 .notch-wings:focus-visible { outline-offset: -2px; }
 .focus{position:relative}
 .focus-meta{grid-column:2;grid-row:1;min-width:0;align-self:center}
+.focus[data-menu-open]{z-index:2}
 .focus[data-menu-open]>.focus-meta{visibility:hidden}
 .focus-trigger{position:relative;display:inline-flex;align-items:center;padding:0;border:0;background:none;color:var(--notch-ink);text-align:left;cursor:pointer}
 .focus-time{min-height:54px;justify-self:start}
@@ -203,3 +207,18 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
 .shelf-menu button:focus-visible{outline:2px solid var(--notch-ink);outline-offset:-2px}
 .shelf-menu button:disabled{color:color-mix(in srgb,var(--notch-ink) 35%,transparent);cursor:default}
 .shelf-menu [data-command=remove]{color:#ffb094}
+
+.notification-banner { grid-area:2 / 1; min-width:0; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; overflow:hidden; }
+.notification-banner [role=status] { min-width:0; }
+.notification-banner [data-banner-source] { display:block; font-size:12px; color:color-mix(in srgb,var(--notch-ink) 70%,transparent); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.notification-banner strong { display:block; font-size:18px; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.notification-banner p { margin:4px 0 0; font-size:14px; line-height:1.3; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow-wrap:anywhere; }
+.banner-dismiss { min-width:70px; min-height:44px; border:0; border-radius:8px; background:transparent; font-size:14px; cursor:pointer; touch-action:manipulation; }
+.banner-dismiss:active { background:color-mix(in srgb,var(--notch-ink) 18%,transparent); }
+@media (hover:hover) and (pointer:fine) { .banner-dismiss:hover { background:color-mix(in srgb,var(--notch-ink) 12%,transparent); } }
+.notch[data-banner] .view { visibility:hidden !important; pointer-events:none; }
+.focus-extend,.focus-end,.shelf-command{min-height:30px;padding:4px 8px;border:0;border-radius:8px;background:color-mix(in srgb,var(--notch-ink) 8%,transparent);color:var(--notch-ink);font:inherit;font-size:12px;cursor:pointer;white-space:nowrap}
+.focus-extend:hover,.focus-end:hover,.shelf-command:hover{background:color-mix(in srgb,var(--notch-ink) 15%,transparent)}
+.focus-extend:disabled,.focus-end:disabled{opacity:.4;cursor:default}
+.focus .controls{flex-wrap:wrap;max-width:116px;justify-content:flex-end}
+.focus .controls:has(.focus-end:not([hidden])){max-width:168px}

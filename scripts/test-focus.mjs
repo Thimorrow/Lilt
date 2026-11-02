@@ -34,3 +34,11 @@ test('UI requests native actions, including failed completion retry, without own
   const snapshot = focusSnapshot({ ...idle(), remaining: 1234 });
   assert.equal(snapshot.remaining, 1234);
 });
+
+test('extended focus accepts authoritative extra time and validates extension availability', () => {
+  const extended = { ...idle(), phase: 'running', duration: 60, totalDuration: 360, remaining: 300, canExtend: true };
+  assert.equal(focusSnapshot(extended).remaining, 300);
+  assert.equal(focusSnapshot({ ...extended, canExtend: 'yes' }), null);
+  assert.equal(focusSnapshot({ ...extended, totalDuration: 10801 }), null);
+  assert.equal(focusAction({ ...extended, error: { action: 'extend' } }), 'extend');
+});

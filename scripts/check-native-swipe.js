@@ -1,6 +1,10 @@
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const checks = [];
 const check = (name, pass) => checks.push({ name, pass: Boolean(pass) });
+const markerIndex = () => {
+  const style = getComputedStyle(document.querySelector('.tabs'), '::before');
+  return new DOMMatrixReadOnly(style.transform).m41 / (parseFloat(style.width) + 2);
+};
 const point = selector => {
   const rect = document.querySelector(selector).getBoundingClientRect();
   return [rect.left + rect.width / 2, rect.top + rect.height / 2];
@@ -31,7 +35,11 @@ await wait(350);
 check('outside edge settles to original page', Lilt.inspect().view === 'music' && !document.querySelector('#view-music').style.transform);
 Lilt.swipeGesture('begin', -20, 0, 0, x, y);
 Lilt.swipeGesture('change', -25, 0, 0, x, y);
+await new Promise(requestAnimationFrame);
+const markerBeforeRelease = markerIndex();
 Lilt.swipeGesture('end', 0, 0, 1, x, y);
+check('swipe release keeps the tab marker attached to the moving pages', markerBeforeRelease > 0 && markerBeforeRelease < 1 &&
+  Math.abs(markerIndex() - markerBeforeRelease) < .001);
 check('completed gesture selects the next tab', Lilt.inspect().view === 'focus');
 await wait(300);
 check('gesture settles with only selected view accessible', !document.querySelector('#view-focus').inert && document.querySelector('#view-music').inert &&
@@ -77,9 +85,7 @@ for (let sample = 1; sample <= 80; sample++) Lilt.swipeGesture('change', -.5, 0,
 check('input burst does not repeatedly repaint between display frames', trackedView.style.transform === beforeBurst);
 await new Promise(requestAnimationFrame);
 await Promise.resolve();
-check('tab marker follows the same continuous position as the content',
-  Number(document.querySelector('#notch').style.getPropertyValue('--tab-index')) > 0 &&
-  Number(document.querySelector('#notch').style.getPropertyValue('--tab-index')) < 1);
+check('tab marker follows the same continuous position as the content', markerIndex() > 0 && markerIndex() < 1);
 check('input burst paints one accumulated position per display frame', transformWrites === 1 &&
   Math.abs(new WebKitCSSMatrix(getComputedStyle(trackedView).transform).m41 *
     (trackedView.getBoundingClientRect().width / trackedView.offsetWidth) + 52) < 1);

@@ -5,6 +5,8 @@ export function focusSnapshot(value) {
   if (!value || !Object.hasOwn(ACTIVITIES, value.activity) || !FOCUS_PHASES.includes(value.phase)
     || !Number.isInteger(value.duration) || value.duration < 60 || value.duration > 10800
     || !Number.isFinite(value.remaining) || value.remaining < 0 || value.remaining > 10800) return null;
+  if (value.canExtend !== undefined && typeof value.canExtend !== 'boolean') return null;
+  if (value.totalDuration !== undefined && (!Number.isInteger(value.totalDuration) || value.totalDuration < value.duration || value.totalDuration > 10800)) return null;
   return { ...value, ready: true };
 }
 export const focusLocked = focus => !focus.ready || Boolean(focus.pending) || focus.phase === 'running' || focus.phase === 'uncertain' || focus.restoring;

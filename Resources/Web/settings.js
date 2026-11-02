@@ -15,12 +15,15 @@ let openMenuKey = null;
 const menuAnimations = new WeakMap();
 let keyboardUpdate = false;
 let pendingFocus = null;
+let recordingShortcut = false;
+let shortcutRecordingError = '';
 const find = selector => document.querySelector(selector);
 const all = selector => [...document.querySelectorAll(selector)];
 const native = body => window.webkit?.messageHandlers?.lilt?.postMessage(body);
 const reduced = () => media.matches || root.classList.contains('reduce-motion');
 const text = (selector, value) => { const element = find(selector); if (element.textContent !== value) element.textContent = value; };
 const announce = value => text('[data-announce]', value);
+const sameSetting = (left, right) => left === right || (left && right && typeof left === 'object' && typeof right === 'object' && left.keyCode === right.keyCode && left.modifiers === right.modifiers);
 window.addEventListener('error', event => errors.push(event.message));
 window.addEventListener('unhandledrejection', event => errors.push(String(event.reason)));
 
@@ -33,6 +36,7 @@ function instant(change) {
 
 function setSection(next, { focus = false, animate = true } = {}) {
   if (!SETTINGS_SECTIONS.includes(next)) return;
+  if (recordingShortcut) native({ action: 'shortcutCancelRecording' });
   const apply = () => {
     section = next;
     find('.settings-nav').style.setProperty('--nav-index', SETTINGS_SECTIONS.indexOf(next));
@@ -57,7 +61,7 @@ function setSection(next, { focus = false, animate = true } = {}) {
 function sendChanges(changes, { keyboard = false } = {}) {
   if (!state.ready || requested) return;
   if (Object.keys(changes).some(key => key === 'musicSource' ? state.musicBusy : ['focusMinutes', 'focusActivity', 'brainFMEnabled'].includes(key) && state.focusLocked)) return;
-  if (Object.entries(changes).every(([key, value]) => state[key] === value)) return;
+  if (Object.entries(changes).every(([key, value]) => sameSetting(state[key], value))) return;
   localError = null;
   requested = changes;
   keyboardUpdate = keyboard;
@@ -155,6 +159,9 @@ function renderFocus() {
 function render() {
   renderMusic();
   renderFocus();
+  text('[data-notification-status]', state.notificationCaptureMessage);
+  find('[data-action="notification-settings"]').disabled = !state.ready || !state.notificationBannersEnabled || state.notificationCaptureStatus === 'diagnostic';
+  find('[data-action="notification-preview"]').disabled = !state.ready;
   find('[data-display-unavailable]').hidden = !state.displayUnavailable;
   all('[data-toggle]').forEach(toggle => {
     const key = toggle.dataset.toggle;
@@ -162,6 +169,22 @@ function render() {
     toggle.disabled = !state.ready || (Boolean(requested) && !Object.hasOwn(requested, key));
   });
   text('[data-shortcut-label]', state.shortcutLabel);
+  const record = find('[data-action="shortcut-record"]');
+  record.disabled = !state.ready || Boolean(requested);
+  record.setAttribute('aria-pressed', String(recordingShortcut));
+  record.setAttribute('aria-label', recordingShortcut ? 'Cancel shortcut recording' : `Record keyboard shortcut, currently ${state.shortcutLabel}`);
+  if (recordingShortcut) text('[data-shortcut-label]', 'Press shortcut…');
+  text('[data-shortcut-recording]', shortcutRecordingError || 'Press a key with Control, Option or Command. Escape cancels.');
+  find('[data-shortcut-recording]').hidden = !recordingShortcut;
+  find('[data-action="shortcut-reset"]').hidden = state.shortcut?.keyCode === 37 && state.shortcut?.modifiers === 6144;
+  find('[data-action="shortcut-reset"]').disabled = !state.ready || Boolean(requested) || recordingShortcut;
+  const notifications = find('#focus-notification-toggle');
+  notifications.setAttribute('aria-checked', String(state.focusNotificationsEnabled));
+  notifications.disabled = !state.ready || Boolean(requested) || state.focusNotificationRequesting === true;
+  notifications.setAttribute('aria-busy', String(state.focusNotificationRequesting === true));
+  const notificationStatus = { denied: 'Notifications are blocked in System Settings → Notifications → Lilt.', error: 'The timer notification could not be scheduled.', diagnostic: 'System notifications are disabled in this test.' }[state.focusNotificationStatus] || '';
+  text('[data-focus-notification-status]', state.focusNotificationStatus === 'diagnostic' && !state.focusNotificationsEnabled ? '' : notificationStatus);
+  find('[data-focus-notification-status]').hidden = !notificationStatus || state.focusNotificationStatus === 'diagnostic' && !state.focusNotificationsEnabled;
   find('[data-shortcut-conflict]').hidden = !state.shortcutConflict || !state.shortcutEnabled;
   all('[data-retention-form]').forEach(form => {
     const key = form.dataset.retentionForm;
@@ -194,7 +217,7 @@ function receiveSnapshot(value) {
   const snapshot = settingsSnapshot(value);
   if (!snapshot) return;
   state = snapshot;
-  if (requested && (state.error || Object.entries(requested).every(([key, value]) => state[key] === value))) {
+  if (requested && (state.error || Object.entries(requested).every(([key, value]) => sameSetting(state[key], value)))) {
     clearTimeout(requestTimer);
     if (!state.error) {
       if (Object.hasOwn(requested, 'focusMinutes')) durationDirty = false;
@@ -402,8 +425,16 @@ document.addEventListener('pointerdown', event => {
   if (openMenuKey && !event.target.closest('.menu-field')) closeMenu();
 });
 
-const actions = { 'music-connect': 'musicConnect', 'music-open': 'musicOpen', 'brainfm-permission': 'brainfmSettings', 'brainfm-open': 'brainfm' };
-all('[data-action]').forEach(button => button.addEventListener('click', () => native({ action: actions[button.dataset.action] })));
+const actions = { 'notification-settings': 'notificationAccessibilitySettings', 'notification-preview': 'notificationPreview', 'music-connect': 'musicConnect', 'music-open': 'musicOpen', 'brainfm-permission': 'brainfmSettings', 'brainfm-open': 'brainfm' };
+all('[data-action]').forEach(button => button.addEventListener('click', () => {
+  if (button.dataset.action === 'shortcut-record') { native({ action: recordingShortcut ? 'shortcutCancelRecording' : 'shortcutRecord' }); return; }
+  if (button.dataset.action === 'shortcut-reset') { sendChanges({ shortcut: { keyCode: 37, modifiers: 6144 } }); return; }
+  if (actions[button.dataset.action]) native({ action: actions[button.dataset.action] });
+}));
+find('#focus-notification-toggle').addEventListener('click', () => {
+  if (state.focusNotificationsEnabled) sendChanges({ focusNotificationsEnabled: false });
+  else native({ action: 'focusNotificationPermission' });
+});
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape') { event.preventDefault(); native({ action: 'settingsClose' }); }
 });
@@ -411,12 +442,18 @@ media.addEventListener('change', () => { if (reduced()) document.getAnimations()
 
 window.LiltSettings = Object.freeze({
   receiveSnapshot,
+  receiveShortcutRecording({ recording, error = '' } = {}) {
+    if (typeof recording !== 'boolean') return;
+    recordingShortcut = recording;
+    shortcutRecordingError = error;
+    render();
+  },
   configure({ reducedMotion } = {}) {
     if (typeof reducedMotion === 'boolean') root.classList.toggle('reduce-motion', reducedMotion);
     if (reduced()) document.getAnimations().forEach(animation => animation.cancel());
   },
   setSection,
-  inspect: () => structuredClone({ ...state, section, requested, localError, reducedMotion: reduced(), errors }),
+  inspect: () => structuredClone({ ...state, section, requested, localError, recordingShortcut, reducedMotion: reduced(), errors }),
 });
 instant(render);
 await document.fonts.ready;

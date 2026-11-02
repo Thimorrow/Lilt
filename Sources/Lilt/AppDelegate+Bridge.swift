@@ -8,6 +8,22 @@ extension AppDelegate: WKScriptMessageHandler, WKNavigationDelegate {
         case "settingsUpdate":
             guard let changes = body["changes"] as? [String: Any] else { return }
             updateSettings(changes)
+        case "notificationPreview": previewNotification()
+        case "notificationAccessibilitySettings": notificationAccessibilitySettings()
+        case "shortcutRecord":
+            shortcut?.setEnabled(false)
+            settingsWindow?.beginShortcutRecording()
+        case "shortcutCancelRecording": settingsWindow?.endShortcutRecording()
+        case "shortcutRecordingEnded": applyShortcut()
+        case "focusNotificationPermission": enableFocusNotifications()
+        case "testShortcutKey":
+            guard diagnosticDirectory != nil, let code = body["keyCode"] as? Int, (0...127).contains(code),
+                  let flags = body["modifiers"] as? UInt,
+                  flags & ~NSEvent.ModifierFlags([.command, .control, .option, .shift]).rawValue == 0,
+                  let window = settingsWindow?.window,
+                  let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: NSEvent.ModifierFlags(rawValue: flags), timestamp: 0,
+                      windowNumber: window.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: UInt16(code)) else { return }
+            _ = settingsWindow?.recordShortcutKey(event)
         case "musicConnect": connectMusic()
         case "musicOpen": openMusic()
         case "brainfmSettings": openAccessibilitySettings()
@@ -38,6 +54,20 @@ extension AppDelegate: WKScriptMessageHandler, WKNavigationDelegate {
         guard message.frameInfo.isMainFrame, message.webView === webView,
               let body = message.body as? [String: Any], let action = body["action"] as? String else { return }
         switch action {
+        case "viewChanged":
+            if let view = body["view"] as? String, ["music", "focus", "shelf"].contains(view) { selectedView = view; panelInteractionRevision += 1 }
+        case "testShelfPaste":
+            guard diagnosticDirectory != nil, let names = body["names"] as? [String], !names.isEmpty,
+                  names.count <= 100, names.allSatisfy({ !$0.isEmpty && !$0.contains("/") && $0 != "." && $0 != ".." }) else { return }
+            let pasteboard = NSPasteboard.withUniqueName()
+            diagnosticShelfPasteboard?.releaseGlobally()
+            diagnosticShelfPasteboard = pasteboard
+            pasteboard.writeObjects(names.map { dataDirectory.appendingPathComponent("fixtures", isDirectory: true).appendingPathComponent($0) as NSURL })
+        case "testShelfKey":
+            guard diagnosticDirectory != nil, let code = body["keyCode"] as? UInt16, [6, 9].contains(code),
+                  let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0, windowNumber: panel.windowNumber,
+                    context: nil, characters: code == 6 ? "z" : "v", charactersIgnoringModifiers: code == 6 ? "z" : "v", isARepeat: false, keyCode: code) else { return }
+            _ = webView.performKeyEquivalent(with: event)
         case "ready":
             ready = true
             configureUI()
@@ -46,11 +76,30 @@ extension AppDelegate: WKScriptMessageHandler, WKNavigationDelegate {
             sendSettings()
             sendMusic()
             panel.orderFrontRegardless()
+            if openFocusOnReady {
+                openFocusOnReady = false
+                send("setView", value: "focus")
+                setOpen(true)
+                panel.makeKey()
+            }
             if smokeTest { DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { self.runSmokeTest() } }
+        case "notificationDismiss":
+            guard let raw = body["id"] as? String, let id = UUID(uuidString: raw), notificationOwner.visible?.id == id else { return }
+            notificationInteraction(keepOpen: false)
+        case "notificationTakeover":
+            guard let raw = body["id"] as? String, let id = UUID(uuidString: raw), notificationOwner.visible?.id == id else { return }
+            notificationInteraction(keepOpen: true)
+        case "testNotification":
+            guard diagnosticDirectory != nil else { return }
+            if body["clear"] as? Bool == true { notificationOwner.clear() }
+            else if body["expire"] as? Bool == true { notificationOwner.expire(now: Date().addingTimeInterval(9)) }
+            else { previewNotification(body) }
         case "openChanged":
             if let open = body["open"] as? Bool {
+                panelInteractionRevision += 1
+                if !open || body["userOwned"] as? Bool == true { notificationInteraction(keepOpen: open) }
                 isOpen = open
-                if !open { panel.resignKey() }
+                if !open, panel.isKeyWindow { panel.resignKey() }
             }
         case "hitRect":
             if let x = body["x"] as? Double, let y = body["y"] as? Double,
@@ -82,6 +131,9 @@ extension AppDelegate: WKScriptMessageHandler, WKNavigationDelegate {
             focus.configureIntervals(workMinutes: work.intValue, restMinutes: rest.intValue)
         case "focusIntervalsNext": focus.nextInterval()
         case "shelfAction": shelfAction(body)
+        case "shelfDragRegions": receiveShelfDragRegions(body)
+        case "testOutsideInteraction":
+            if diagnosticDirectory != nil { dismissMenusOrClose() }
         case "swipeHaptic": NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         case "testFocus": diagnosticFixture(body)
         case "quit": quit()

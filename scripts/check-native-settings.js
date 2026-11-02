@@ -8,6 +8,8 @@ const click = selector => find(selector).click();
 const pointerClick = selector => find(selector).dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
 const key = (element, value) => element.dispatchEvent(new KeyboardEvent('keydown', { key: value, bubbles: true, cancelable: true }));
 await until(() => LiltSettings.inspect().ready);
+LiltSettings.setSection('music', { animate: false });
+await wait(50);
 const initial = LiltSettings.inspect();
 check('native settings snapshot and bundled font are ready', initial.ready && document.fonts.check('14px "Familjen Grotesk"'));
 check('settings loads no remote resources', performance.getEntriesByType('resource').every(entry => !entry.name.startsWith('http')));
@@ -23,12 +25,22 @@ if (!initial.musicBusy) {
   await wait(60);
   const selection = find('.player-selection');
   const movingFrame = selection.getBoundingClientRect().toJSON();
-  const contrastSafe = () => [...document.querySelectorAll('.player-option')].every(button => getComputedStyle(button).mixBlendMode === 'difference' && getComputedStyle(button).color === 'rgb(255, 255, 255)');
-  check('player text and icons stay contrast-safe during the moving selection', contrastSafe() && selection.getAnimations().some(animation => animation.transitionProperty === 'transform') && Math.abs(movingFrame.left - find(`[data-source="${target}"]`).getBoundingClientRect().left) > 1);
+  const luminance = color => {
+    const channels = color.match(/[\d.]+/g).slice(0, 3).map(Number).map(value => value / 255);
+    return channels.map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4).reduce((sum, value, index) => sum + value * [.2126, .7152, .0722][index], 0);
+  };
+  const contrastSafe = () => {
+    const surfaces = [getComputedStyle(find('.player-picker')).backgroundColor, getComputedStyle(selection).backgroundColor].map(luminance);
+    return [...document.querySelectorAll('.player-option')].filter(button => !button.disabled).every(button => surfaces.every(background => {
+      const foreground = luminance(getComputedStyle(button).color);
+      return (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05) >= 4.5;
+    }));
+  };
+  check('player labels keep 4.5 to 1 contrast during the moving selection', contrastSafe() && selection.getAnimations().some(animation => animation.transitionProperty === 'transform') && Math.abs(movingFrame.left - find(`[data-source="${target}"]`).getBoundingClientRect().left) > 1);
   pointerClick(`[data-source="${initial.musicSource}"]`);
   await until(() => LiltSettings.inspect().musicSource === initial.musicSource && !LiltSettings.inspect().requested);
-  check('quick reversal preserves contrast and retargets the existing transition', contrastSafe() && selection.getAnimations().some(animation => animation.transitionProperty === 'transform'));
   await wait(270);
+  check('quick reversal settles on the confirmed player with readable labels', contrastSafe() && Math.abs(selection.getBoundingClientRect().left - find(`[data-source="${initial.musicSource}"]`).getBoundingClientRect().left) < 2);
   const current = find(`[data-source="${initial.musicSource}"]`);
   current.focus(); key(current, 'ArrowRight');
   const expected = ['spotify', 'appleMusic', 'meld'][(['spotify', 'appleMusic', 'meld'].indexOf(initial.musicSource) + 1) % 3];

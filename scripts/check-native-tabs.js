@@ -2,6 +2,7 @@ const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const frame = () => new Promise(requestAnimationFrame);
 const checks = [];
 const check = (name, pass) => checks.push({ name, pass: Boolean(pass) });
+const stableJSON = value => JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
 const notch = document.querySelector('#notch');
 const views = ['music', 'focus', 'shelf'];
 const panels = views.map(view => document.querySelector(`#view-${view}`));
@@ -116,7 +117,7 @@ for (const view of views) {
 }
 Lilt.setView('music'); Lilt.setOpen(true); await wait(650);
 const final = Lilt.inspect();
-check('tab motion preserves music, focus and shelf state', JSON.stringify({ ...final.music, since: 0 }) === JSON.stringify({ ...baseline.music, since: 0 }) && JSON.stringify(final.focus) === JSON.stringify(baseline.focus) && JSON.stringify(final.shelf) === JSON.stringify(baseline.shelf));
+check('tab motion preserves music, focus and shelf state', stableJSON({ ...final.music, since: 0 }) === stableJSON({ ...baseline.music, since: 0 }) && stableJSON(final.focus) === stableJSON(baseline.focus) && stableJSON(final.shelf) === stableJSON(baseline.shelf));
 check('tab switching sends no focus playback request', final.focus.pending === null && final.focus.deadline === baseline.focus.deadline);
 check('no runtime errors', final.errors.length === 0);
 return { checks, geometry, transitions, beforeReverse, afterReverse, rapid, state: final };

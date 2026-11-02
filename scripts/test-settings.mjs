@@ -84,3 +84,13 @@ test('general switches accept only native booleans and a shortcut label', () => 
   }
   assert.equal(settingsSnapshot(snapshot({ shortcutLabel: null })), null);
 });
+
+test('native shortcut and timer notification snapshots reject malformed confirmation', () => {
+  const value = { ...freshSettings(), shortcut: { keyCode: 3, modifiers: 768 }, focusNotificationsEnabled: true, focusNotificationStatus: 'allowed', focusNotificationRequesting: false };
+  assert.equal(settingsSnapshot(value).shortcut.keyCode, 3);
+  assert.equal(settingsSnapshot({ ...value, shortcut: { keyCode: true, modifiers: 768 } }), null);
+  assert.equal(settingsSnapshot({ ...value, shortcut: { keyCode: 3, modifiers: 512 } }), null);
+  assert.equal(settingsSnapshot({ ...value, focusNotificationsEnabled: 1 }), null);
+  assert.equal(settingsSnapshot({ ...value, focusNotificationStatus: 'invented' }), null);
+  assert.equal(settingsSnapshot({ ...value, focusNotificationRequesting: 1 }), null);
+});

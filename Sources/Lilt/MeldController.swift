@@ -228,6 +228,7 @@ final class MusicCoordinator {
     func startObserving() {
         guard timer == nil else { return }
         timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in self?.recheck() }
+        timer?.tolerance = 0.2
         RunLoop.main.add(timer!, forMode: .common)
         recheck()
     }

@@ -39,6 +39,12 @@ struct FocusIntervals: Codable, Equatable {
         state = .ready
     }
 
+    mutating func reopen() {
+        guard state == .awaitingNext else { return }
+        if phase == .work { completedWorkPeriods = max(0, completedWorkPeriods - 1) }
+        state = .active
+    }
+
     mutating func stop() { state = .stopped }
 
     var isValid: Bool {

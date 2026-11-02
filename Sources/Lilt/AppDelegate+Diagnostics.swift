@@ -47,9 +47,10 @@ extension AppDelegate {
               let command = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               let id = command["id"] as? String, id != lastDiagnosticID,
               let script = command["script"] as? String else { return }
-        lastDiagnosticID = id
         let settingsTarget = command["target"] as? String == "settings"
         if settingsTarget, settingsWindow == nil { showSettings() }
+        guard settingsTarget ? settingsWindow?.ready == true : ready else { return }
+        lastDiagnosticID = id
         if settingsTarget, let size = command["settingsSize"] as? [String: Double],
            let width = size["width"], let height = size["height"],
            width.isFinite, height.isFinite, (700...1600).contains(width), (540...1200).contains(height) {
@@ -59,6 +60,16 @@ extension AppDelegate {
         targetWebView.callAsyncJavaScript(script, arguments: [:], in: nil, in: .page) { [weak self] result in
             guard let self else { return }
             var response: [String: Any] = ["id": id, "panelFrame": NSStringFromRect(self.panel.frame), "surfaceRect": NSStringFromRect(self.surfaceRect), "ignoresMouseEvents": self.panel.ignoresMouseEvents,
+                "notificationCaptureStatus": self.notificationStatus.rawValue,
+                "notificationVisible": self.notificationOwner.visible != nil,
+                "shelfDragActive": self.webView.isDraggingShelfFiles,
+                "shelfDragCompletions": self.webView.completedShelfDrags,
+                "shelfDragOperation": self.webView.lastShelfDragOperation,
+                "shelfDragRegionCount": self.shelfDragRegions.count,
+                "selectedNativeView": self.selectedView,
+                "notificationPanelKey": self.panel.isKeyWindow,
+                "notificationAcceptsKey": self.panel.permitsKey,
+                "notificationGeneration": self.notificationOwner.generation,
                 "brainfmPermission": self.brainFM.hasPermission,
                 "brainfmScan": self.brainFM.lastScanSummary,
                 "dataDirectory": self.dataDirectory.path, "simulatedBrainFM": self.simulated, "simulatedMeld": self.simulatedMeld,

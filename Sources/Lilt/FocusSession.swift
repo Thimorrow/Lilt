@@ -18,6 +18,9 @@ struct FocusSession: Codable, Equatable {
     var needsFinish = false
     var brainFMEnabled: Bool?
     var intervals: FocusIntervals?
+    var extensionSeconds: Int?
+
+    var totalDuration: Int { duration + (extensionSeconds ?? 0) }
 
     func seconds(at now: Date) -> Int {
         Int(ceil(max(0, deadline.map { $0.timeIntervalSince(now) } ?? remaining)))
@@ -31,7 +34,10 @@ struct FocusSession: Codable, Equatable {
     mutating func confirm(_ playback: BrainFMController.PlaybackState, at now: Date) {
         if playback == .playing {
             if phase != .running {
-                if remaining <= 0 { remaining = Double(duration) }
+                if remaining <= 0 {
+                    remaining = Double(duration)
+                    extensionSeconds = nil
+                }
                 deadline = now.addingTimeInterval(remaining)
             }
             phase = .running
@@ -54,6 +60,18 @@ struct FocusSession: Codable, Equatable {
     mutating func reset() {
         self = FocusSession(activity: activity, duration: duration, remaining: Double(duration))
     }
+
+    mutating func extend(at now: Date) {
+        extensionSeconds = (extensionSeconds ?? 0) + 300
+        if phase == .completed {
+            remaining = 300
+            phase = .paused
+            intervals?.reopen()
+        } else {
+            remaining = Double(seconds(at: now)) + 300
+            if phase == .running { deadline = max(deadline ?? now, now).addingTimeInterval(300) }
+        }
+    }
 }
 
 protocol BrainFMControlling: AnyObject {
@@ -62,7 +80,7 @@ protocol BrainFMControlling: AnyObject {
 }
 
 final class FocusCoordinator {
-    enum Action: String { case start, pause, reset, finish }
+    enum Action: String { case start, pause, reset, finish, extend }
     struct Pending {
         let id = UUID()
         let action: Action
@@ -80,6 +98,7 @@ final class FocusCoordinator {
     private let file: URL
     private let now: () -> Date
     private var timer: Timer?
+    private var observing = false
     private var polling = false
     private var lastPoll = Date.distantPast
     private var lastSave = Date.distantPast
@@ -95,7 +114,10 @@ final class FocusCoordinator {
         if let data = try? Data(contentsOf: file),
            let saved = try? JSONDecoder().decode(FocusSession.self, from: data),
            (60...10800).contains(saved.duration), saved.remaining.isFinite,
-           saved.remaining >= 0, saved.remaining <= 10800 {
+           saved.remaining >= 0, saved.remaining <= 10800,
+           (saved.extensionSeconds ?? 0) >= 0,
+           (saved.extensionSeconds ?? 0).isMultiple(of: 300),
+           (saved.extensionSeconds ?? 0) <= 10800 - saved.duration {
             session = saved
             let savedMode = saved.brainFMEnabled ?? true
             if savedMode != brainFMEnabled, saved.phase != .idle, saved.phase != .completed {
@@ -125,6 +147,12 @@ final class FocusCoordinator {
 
     var canApplyDefaults: Bool { session.phase == .idle && session.intervals == nil }
 
+    var canExtend: Bool {
+        pending == nil && !restoring && !session.needsFinish
+            && [.running, .paused, .completed].contains(session.phase)
+            && session.totalDuration <= 10500
+    }
+
     @discardableResult
     func setBrainFMEnabled(_ enabled: Bool) -> Bool {
         if brainFMEnabled == enabled { return true }
@@ -137,14 +165,23 @@ final class FocusCoordinator {
     }
 
     func startObserving() {
-        guard timer == nil else { return }
-        timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in self?.tick() }
-        RunLoop.main.add(timer!, forMode: .common)
+        guard !observing else { return }
+        observing = true
         if restoring { poll() }
         publish()
     }
 
-    func stop() { timer?.invalidate(); timer = nil; save() }
+    private func updateTimer() {
+        let needed = observing && (session.phase == .running || restoring || pending != nil || usesBrainFM && session.owned)
+        if !needed { timer?.invalidate(); timer = nil; return }
+        guard timer == nil else { return }
+        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in self?.tick() }
+        timer.tolerance = 0.025
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+    }
+
+    func stop() { observing = false; timer?.invalidate(); timer = nil; save() }
     func checkpoint() { save(); publish() }
 
     func configure(activity: FocusActivity, minutes: Int) {
@@ -187,6 +224,13 @@ final class FocusCoordinator {
 
     func request(_ action: Action) {
         guard pending == nil, !restoring else { return }
+        if action == .extend {
+            guard canExtend else { return }
+            if !usesBrainFM || session.phase != .completed {
+                applyIndependent(action)
+                return
+            }
+        }
         if action == .start, session.intervals?.state == .awaitingNext { return }
         if !usesBrainFM {
             applyIndependent(action)
@@ -206,17 +250,19 @@ final class FocusCoordinator {
     private func runPending() {
         guard let request = pending, commandStarted != request.id else { return }
         commandStarted = request.id
-        player.perform(request.action == .start ? .play : .pause, activity: session.activity) { [weak self] result in
+        let startsPlayback = request.action == .start || request.action == .extend
+        player.perform(startsPlayback ? .play : .pause, activity: session.activity) { [weak self] result in
             guard let self, self.pending?.id == request.id else { return }
             self.pending = nil
             self.commandStarted = nil
             switch result {
             case .success(let playback):
-                let expected: BrainFMController.PlaybackState = request.action == .start ? .playing : .paused
+                let expected: BrainFMController.PlaybackState = startsPlayback ? .playing : .paused
                 guard playback == expected else { self.fail(.timeout, retry: request.action); return }
                 if request.action == .reset { self.session.reset() }
                 else if request.action == .finish { self.complete() }
                 else {
+                    if request.action == .extend { self.session.extend(at: self.now()) }
                     self.session.confirm(playback, at: self.now())
                     if request.action == .start { self.session.intervals?.started() }
                 }
@@ -245,6 +291,10 @@ final class FocusCoordinator {
             if session.phase == .running { session.confirm(.paused, at: now()) }
         case .reset: session.reset()
         case .finish: complete()
+        case .extend:
+            let completed = session.phase == .completed
+            session.extend(at: now())
+            if completed { session.confirm(.playing, at: now()) }
         }
         error = nil; retry = nil
         save(); publish()
@@ -338,10 +388,11 @@ final class FocusCoordinator {
         }
     }
 
-    private func publish() { lastSecond = session.seconds(at: now()); onChange?() }
+    private func publish() { updateTimer(); lastSecond = session.seconds(at: now()); onChange?() }
 
     var snapshot: [String: Any] {
         ["activity": session.activity.rawValue, "duration": session.duration,
+         "totalDuration": session.totalDuration, "canExtend": canExtend,
          "remaining": session.seconds(at: now()), "deadline": session.deadline.map { $0.timeIntervalSince1970 * 1000 } as Any? ?? NSNull(),
          "phase": restoring ? "checking" : session.phase.rawValue, "owned": session.owned, "restoring": restoring,
          "brainFMEnabled": brainFMEnabled, "integrationLocked": integrationLocked,

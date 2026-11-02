@@ -4,13 +4,14 @@ import Quartz
 // Shelf files, sharing and Quick Look. The context menu is rendered by the web view.
 extension AppDelegate: QLPreviewPanelDataSource, QLPreviewPanelDelegate, NSSharingServicePickerDelegate {
     func chooseFiles() {
+        notificationInteraction(keepOpen: true)
         selectingFiles = true
         NSApp.activate(ignoringOtherApps: true)
         let chooser = NSOpenPanel()
         chooser.title = "Dateien zur Ablage hinzufügen"
         chooser.message = "Originale bleiben an ihrem Ort. Lilt merkt sich lokale Dateiverweise."
         chooser.allowsMultipleSelection = true
-        chooser.canChooseDirectories = false
+        chooser.canChooseDirectories = true
         chooser.canChooseFiles = true
         chooser.begin { [weak self] result in
             guard let self else { return }
@@ -34,6 +35,8 @@ extension AppDelegate: QLPreviewPanelDataSource, QLPreviewPanelDelegate, NSShari
 
     func shelfAction(_ body: [String: Any]) {
         guard let action = body["command"] as? String else { return }
+        if action == "paste" { pasteShelf(); return }
+        if action == "undo" { shelf.undoRemoval(); sendShelf(); return }
         if action == "clear" { shelf.clear(); sendShelf(); return }
         if action == "refresh" { sendShelf(); return }
         shelf.pruneExpired()
@@ -67,10 +70,6 @@ extension AppDelegate: QLPreviewPanelDataSource, QLPreviewPanelDelegate, NSShari
                 preview.reloadData()
                 preview.makeKeyAndOrderFront(nil)
             }
-        case "drag":
-            let rect = CGRect(x: body["x"] as? Double ?? 0, y: body["y"] as? Double ?? 0,
-                              width: body["width"] as? Double ?? 40, height: body["height"] as? Double ?? 40)
-            if !webView.dragFiles(urls, at: rect) { shelf.report("Ziehe die Datei erneut mit gedrückter Maustaste aus der Ablage.") }
         case "share":
             let picker = NSSharingServicePicker(items: urls)
             sharingPicker = picker
@@ -83,6 +82,46 @@ extension AppDelegate: QLPreviewPanelDataSource, QLPreviewPanelDelegate, NSShari
         default: return
         }
         sendShelf()
+    }
+
+    func receiveShelfDragRegions(_ body: [String: Any]) {
+        guard let regions = body["regions"] as? [[String: Any]], regions.count <= 50,
+              let selected = body["selected"] as? [String], selected.count <= shelf.entries.count else { return }
+        let known = Set(shelf.entries.map(\.id))
+        shelfDragSelection = selected.filter { known.contains($0) }
+        shelfDragRegions = regions.compactMap { region in
+            guard let id = region["id"] as? String, known.contains(id),
+                  let x = region["x"] as? Double, let y = region["y"] as? Double,
+                  let width = region["width"] as? Double, let height = region["height"] as? Double,
+                  [x, y, width, height].allSatisfy(\.isFinite), x >= 0, y >= 0, width > 0, height > 0,
+                  x + width <= webView.bounds.width + 1, y + height <= webView.bounds.height + 1 else { return nil }
+            return (id, CGRect(x: x, y: y, width: width, height: height))
+        }
+    }
+
+    func prepareShelfDrag(at point: CGPoint) {
+        guard isOpen, selectedView == "shelf", !selectingFiles else { return }
+        let htmlPoint = CGPoint(x: point.x, y: webView.isFlipped ? point.y : webView.bounds.height - point.y)
+        guard let region = shelfDragRegions.first(where: { $0.frame.contains(htmlPoint) }) else { return }
+        let ids = shelfDragSelection.contains(region.id) ? shelfDragSelection : [region.id]
+        let urls = ids.compactMap { shelf.resolvedURL(for: $0) }
+        guard urls.count == ids.count else { return }
+        webView.prepareShelfDrag(urls, ids: ids, htmlFrame: region.frame)
+    }
+
+    func pasteShelf() {
+        if isolatedRun, let diagnosticShelfPasteboard { pasteShelf(from: diagnosticShelfPasteboard); return }
+        guard !isolatedRun else {
+            shelf.report("Clipboard access is disabled in diagnostic mode.")
+            sendShelf(); return
+        }
+        pasteShelf(from: .general)
+    }
+
+    func pasteShelf(from pasteboard: NSPasteboard) {
+        let urls = (pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+        guard !urls.isEmpty else { shelf.report("Copy files or folders in Finder, then paste them here."); sendShelf(); return }
+        addFiles(urls)
     }
 
     func sharingServicePicker(_ sharingServicePicker: NSSharingServicePicker, didChoose service: NSSharingService?) {

@@ -10,15 +10,21 @@ final class ShelfStore {
         var expiresAt: Date?
         var retention: String?
     }
+    private struct Removal {
+        let order: [String]
+        let removed: [Entry]
+    }
     private let file: URL
     private let now: () -> Date
     private let thumbnailQueue = DispatchQueue(label: "Lilt.shelf.thumbnails", qos: .utility)
     private var thumbnails: [String: (signature: String, value: String)] = [:]
     private var thumbnailPending: [String: String] = [:]
     private var thumbnailNotification: DispatchWorkItem?
+    private var removals: [Removal] = []
     var onChange: (() -> Void)?
     private(set) var entries: [Entry] = []
     private(set) var message: String?
+    var canUndoRemoval: Bool { !removals.isEmpty }
 
     init(file: URL, now: @escaping () -> Date = Date.init) {
         self.file = file
@@ -38,7 +44,9 @@ final class ShelfStore {
         var rejected = 0
         for candidate in urls {
             let url = candidate.standardizedFileURL.resolvingSymlinksInPath()
-            guard url.isFileURL, (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else { rejected += 1; continue }
+            guard url.isFileURL,
+                  let info = try? url.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey]),
+                  info.isRegularFile == true || info.isDirectory == true else { rejected += 1; continue }
             if entries.contains(where: { resolvedURL(for: $0.id)?.standardizedFileURL.resolvingSymlinksInPath() == url }) { continue }
             do {
                 let bookmark = try url.bookmarkData(options: [.minimalBookmark, .withoutImplicitSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
@@ -84,9 +92,39 @@ final class ShelfStore {
         return resolved
     }
 
-    func remove(_ id: String) { entries.removeAll { $0.id == id }; message = nil; save() }
-    func remove(_ ids: [String]) { let selected = Set(ids); entries.removeAll { selected.contains($0.id) }; message = nil; save() }
-    func clear() { entries = []; message = nil; save() }
+    func remove(_ id: String) { remove([id]) }
+    func remove(_ ids: [String]) {
+        pruneExpired()
+        let selected = Set(ids)
+        let removed = entries.filter { selected.contains($0.id) }
+        guard !removed.isEmpty else { return }
+        removals.append(Removal(order: entries.map(\.id), removed: removed))
+        if removals.count > 20 { removals.removeFirst(removals.count - 20) }
+        entries.removeAll { selected.contains($0.id) }
+        message = nil
+        save()
+    }
+    func clear() { remove(entries.map(\.id)) }
+
+    func undoRemoval() {
+        guard let removal = removals.popLast() else { return }
+        pruneExpired()
+        let deadline = now()
+        var knownURLs = Set(entries.map { resolvedURL(for: $0.id) ?? $0.lastURL })
+        var restored = Dictionary(uniqueKeysWithValues: entries.map { ($0.id, $0) })
+        for entry in removal.removed {
+            guard entry.expiresAt.map({ $0 > deadline }) ?? true, restored[entry.id] == nil else { continue }
+            var stale = false
+            let url = ((try? URL(resolvingBookmarkData: entry.bookmark, options: [.withoutUI, .withoutMounting], relativeTo: nil, bookmarkDataIsStale: &stale)) ?? entry.lastURL)
+                .standardizedFileURL.resolvingSymlinksInPath()
+            guard knownURLs.insert(url).inserted else { continue }
+            restored[entry.id] = entry
+        }
+        let originalIDs = Set(removal.order)
+        entries = removal.order.compactMap { restored[$0] } + entries.filter { !originalIDs.contains($0.id) }
+        message = nil
+        save()
+    }
     func report(_ text: String) { message = text }
 
     var snapshot: [String: Any] {
@@ -95,17 +133,18 @@ final class ShelfStore {
         let items: [[String: Any]] = entries.enumerated().map { index, entry in
             let url = resolvedURL(for: entry.id)
             let current = url ?? entry.lastURL
+            let isDirectory = (try? current.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
             var item: [String: Any] = ["id": entry.id, "name": current.lastPathComponent,
                     "location": current.deletingLastPathComponent().lastPathComponent,
-                    "available": url != nil, "kind": current.pathExtension.uppercased(),
+                    "available": url != nil, "kind": isDirectory ? "FOLDER" : current.pathExtension.uppercased(),
                     "expiresAt": entry.expiresAt.map { $0.timeIntervalSince1970 } as Any? ?? NSNull(),
                     "retention": entry.retention ?? "legacy"]
-            if index < 128, let url, let preview = thumbnail(for: entry.id, url: url) {
+            if !isDirectory, index < 128, let url, let preview = thumbnail(for: entry.id, url: url) {
                 item["thumbnail"] = preview
             }
             return item
         }
-        return ["items": items, "message": message as Any? ?? NSNull()]
+        return ["items": items, "message": message as Any? ?? NSNull(), "canUndoRemoval": canUndoRemoval]
     }
 
     private func thumbnail(for id: String, url: URL) -> String? {

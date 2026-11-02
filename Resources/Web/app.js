@@ -1,5 +1,6 @@
 import { VIEWS, clock, elapsedAt, freshMusic, musicSnapshot, musicAction } from './model.mjs';
 import { freshFocus, focusSnapshot, focusLocked, focusAction } from './focus-state.mjs';
+import { notificationBanner } from './notification-banner.mjs';
 import { selectShelfItem } from './shelf-selection.mjs';
 
 const root = document.documentElement;
@@ -7,6 +8,7 @@ const notch = document.querySelector('#notch');
 const compact = document.querySelector('.notch-compact');
 const panel = document.querySelector('.notch-panel');
 const tabs = [...document.querySelectorAll('[role="tab"]')];
+const tabStrip = document.querySelector('.tabs');
 const viewPanels = VIEWS.map(view => document.querySelector(`#view-${view}`));
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const errors = [];
@@ -16,9 +18,55 @@ const state = {
   focus: freshFocus(),
   settings: { musicSource: 'meld', sourceName: 'Meld', brainFMEnabled: true },
   shelf: [], shelfMessage: null,
+  shelfCanUndo: false,
 };
 const shelfSelection = { selected: new Set(), anchor: null };
+let shelfRegionsFrame = 0;
+let bannerID = null;
+let bridgeReady = false;
+const bannerElement = document.querySelector('.notification-banner');
+function clearBanner(keepOpen = false, notify = true) {
+  if (!bannerID) return;
+  const id = bannerID;
+  bannerID = null;
+  delete notch.dataset.banner;
+  bannerElement.hidden = true;
+  bannerElement.inert = true;
+  bannerElement.querySelectorAll('[data-banner-source], [data-banner-title], [data-banner-body]').forEach(element => { element.textContent = ''; });
+  viewPanels.forEach((view, index) => {
+    const selected = VIEWS[index] === state.view;
+    view.inert = !selected;
+    view.setAttribute('aria-hidden', String(!selected));
+  });
+  if (bannerElement.contains(document.activeElement)) {
+    document.activeElement.blur();
+    if (keepOpen) tabs.find(tab => tab.dataset.view === state.view)?.focus({ preventScroll: true });
+  }
+  announce('');
+  if (notify) {
+    native({ action: keepOpen ? 'notificationTakeover' : 'notificationDismiss', id });
+    if (keepOpen) native({ action: 'openChanged', open: true, userOwned: true });
+  }
+}
+function receiveNotificationBanner(value) {
+  if (value?.clear === true) {
+    if (value.id !== bannerID) return;
+    clearBanner(false, false); setOpen(false); return;
+  }
+  const banner = notificationBanner(value);
+  if (!banner || state.open || bannerID) return;
+  clearSwipeMotion();
+  bannerID = banner.id;
+  notch.dataset.banner = '';
+  for (const key of ['source', 'title', 'body']) bannerElement.querySelector(`[data-banner-${key}]`).textContent = banner[key];
+  bannerElement.hidden = false;
+  bannerElement.inert = false;
+  viewPanels.forEach(view => { view.inert = true; view.setAttribute('aria-hidden', 'true'); });
+  setOpen(true);
+}
+bannerElement.querySelector('button').addEventListener('click', () => setOpen(false, { focus: true }));
 const focusMenu = { kind: null, custom: false, intervals: false };
+let menuDismissalTarget = null;
 const menuAnimations = new WeakMap();
 const reduced = () => reducedMotion.matches || root.classList.contains('reduce-motion');
 reducedMotion.addEventListener('change', () => {
@@ -99,7 +147,7 @@ function render() {
   const pending = state.focus.pending;
   const error = state.focus.error;
   const withMusic = brainFMEnabled() && state.focus.interval?.phase !== 'rest';
-  const focusNote = state.focus.restoring ? withMusic ? 'Checking Brain.fm…' : 'Restoring timer…' : pending ? withMusic ? pending.action === 'start' ? 'Starting Brain.fm…' : 'Pausing Brain.fm…' : 'Updating timer…' : error ? error.code === 'permission' ? 'Allow Lilt in Accessibility.' : error.message : state.focus.interval?.state === 'awaitingNext' ? state.focus.interval.phase === 'work' ? 'Next: Break' : 'Next: Work' : '';
+  const focusNote = state.focus.restoring ? withMusic ? 'Checking Brain.fm…' : 'Restoring timer…' : pending ? withMusic ? ['start', 'extend'].includes(pending.action) ? 'Starting Brain.fm…' : 'Pausing Brain.fm…' : 'Updating timer…' : error ? error.code === 'permission' ? 'Allow Lilt in Accessibility.' : error.message : state.focus.phase === 'completed' ? state.focus.interval?.state === 'awaitingNext' ? state.focus.interval.phase === 'work' ? 'Focus complete' : 'Break complete' : 'Focus complete' : '';
   text('focus-note', focusNote);
   document.querySelector('.focus-note').hidden = !focusNote;
   document.querySelector('.focus-note').title = error?.message || '';
@@ -127,9 +175,17 @@ function render() {
   focus.disabled = Boolean(pending) || !state.focus.ready || state.focus.restoring;
   focus.setAttribute('aria-busy', String(Boolean(pending)));
   focus.setAttribute('aria-label', pending ? withMusic ? 'Waiting for Brain.fm' : 'Updating focus timer' : error ? withMusic ? 'Retry Brain.fm control' : 'Retry focus timer' : running ? withMusic ? 'Pause focus and Brain.fm' : 'Pause focus timer' : withMusic ? 'Start focus and Brain.fm' : 'Start focus timer');
-  if (state.focus.interval?.state === 'awaitingNext') focus.setAttribute('aria-label', state.focus.interval.phase === 'work' ? 'Start break' : 'Start work');
+  if (!error && state.focus.interval?.state === 'awaitingNext') focus.setAttribute('aria-label', state.focus.interval.phase === 'work' ? 'Start break' : 'Start work');
   focus.title = pending ? withMusic ? 'Waiting for Brain.fm' : 'Updating timer' : running ? withMusic ? 'Pause timer and Brain.fm' : 'Pause timer' : withMusic ? 'Start Brain.fm in the background' : 'Start timer';
-  if (state.focus.interval?.state === 'awaitingNext') focus.title = state.focus.interval.phase === 'work' ? 'Start break' : 'Start work';
+  if (!error && state.focus.interval?.state === 'awaitingNext') focus.title = state.focus.interval.phase === 'work' ? 'Start break' : 'Start work';
+  const completed = state.focus.phase === 'completed';
+  const extend = document.querySelector('[data-action="focus-extend"]');
+  extend.hidden = !['running', 'paused', 'completed'].includes(state.focus.phase);
+  extend.disabled = !state.focus.canExtend;
+  const end = document.querySelector('[data-action="focus-end"]');
+  end.hidden = !completed;
+  end.disabled = Boolean(pending) || state.focus.restoring;
+  document.querySelector('[data-action="focus-reset"]').hidden = completed;
   document.querySelector('[data-action="focus-reset"]').disabled = Boolean(pending) || !state.focus.ready || state.focus.restoring;
   document.querySelector('[data-action="focus-reset"]').setAttribute('aria-label', `Reset the focus timer to ${durationLabel}`);
   root.classList.toggle('music-playing', state.music.playing);
@@ -152,7 +208,26 @@ function updateShelfSelection() {
     main.setAttribute('aria-pressed', String(selected));
     main.closest('li').classList.toggle('is-selected', selected);
   });
+  scheduleShelfRegions();
 }
+
+function scheduleShelfRegions() {
+  if (shelfRegionsFrame) return;
+  shelfRegionsFrame = requestAnimationFrame(() => {
+    shelfRegionsFrame = 0;
+    const clip = document.querySelector('.files').getBoundingClientRect();
+    const regions = state.open && state.view === 'shelf' && !shelfMenu.trigger && !bannerID ? [...document.querySelectorAll('.file-main')].flatMap(element => {
+      const r = element.getBoundingClientRect();
+      const x = Math.max(r.left, clip.left), y = Math.max(r.top, clip.top);
+      const width = Math.min(r.right, clip.right) - x, height = Math.min(r.bottom, clip.bottom) - y;
+      return width > 0 && height > 0 ? [{ id: element.dataset.fileID, x, y, width, height }] : [];
+    }).slice(0, 50) : [];
+    native({ action: 'shelfDragRegions', regions, selected: shelfIDs() });
+  });
+}
+document.querySelector('.files').addEventListener('scroll', scheduleShelfRegions, { passive: true });
+window.addEventListener('resize', scheduleShelfRegions);
+notch.addEventListener('transitionend', scheduleShelfRegions);
 
 function shelfIDs() {
   return state.shelf.filter(file => shelfSelection.selected.has(file.id)).map(file => file.id);
@@ -169,18 +244,19 @@ function renderShelf() {
     const main = document.createElement('button');
     main.type = 'button';
     main.className = 'file-main';
-    main.draggable = file.available;
+    main.draggable = false;
     main.dataset.fileID = file.id;
     main.setAttribute('aria-pressed', String(shelfSelection.selected.has(file.id)));
     main.setAttribute('aria-label', `${file.name}, ${file.available ? file.location : 'File unavailable'}${file.retention === 'long' ? ', kept longer' : ''}`);
     main.title = `${file.name} · ${file.location}${file.available ? '' : ' · File unavailable'}`;
     main.innerHTML = '<span class="file-icon" aria-hidden="true"></span><span class="file-details"><strong></strong><small></small></span>';
     const kind = typeof file.kind === 'string' && /^[A-Z0-9]{1,4}$/.test(file.kind) ? file.kind : '';
-    if (kind) main.querySelector('.file-icon').textContent = kind;
+    if (file.kind === 'FOLDER') main.querySelector('.file-icon').innerHTML = '<svg><use href="#i-shelf"/></svg>';
+    else if (kind) main.querySelector('.file-icon').textContent = kind;
     else main.querySelector('.file-icon').innerHTML = '<svg><use href="#i-file"/></svg>';
     const thumbnail = typeof file.thumbnail === 'string' && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(file.thumbnail) && file.thumbnail.length <= 200000 ? file.thumbnail : null;
     if (thumbnail) {
-      const image = document.createElement('img'); image.alt = ''; image.src = thumbnail;
+      const image = document.createElement('img'); image.alt = ''; image.src = thumbnail; image.draggable = false;
       main.querySelector('.file-icon').replaceChildren(image);
     }
     main.querySelector('strong').textContent = file.name;
@@ -188,15 +264,6 @@ function renderShelf() {
     main.addEventListener('contextmenu', event => event.preventDefault());
     main.addEventListener('click', event => { if (event.detail < 2) shelfSelect(file.id, event); });
     main.addEventListener('dblclick', () => shelfCommand('open', file.id));
-    main.addEventListener('dragstart', event => {
-      event.preventDefault();
-      if (!shelfSelection.selected.has(file.id)) {
-        const result = selectShelfItem(state.shelf.map(entry => entry.id), shelfSelection.selected, shelfSelection.anchor, file.id);
-        shelfSelection.selected = result.selected; shelfSelection.anchor = result.anchor;
-      }
-      const rect = main.getBoundingClientRect();
-      shelfCommand('drag', file.id, { ids: shelfIDs(), x: rect.x, y: rect.y, width: rect.width, height: rect.height });
-    });
     main.addEventListener('keydown', event => {
       if (event.key === ' ' || event.key === 'Enter') {
         event.preventDefault();
@@ -246,10 +313,14 @@ function renderShelf() {
   list.scrollTop = scroll;
   list.hidden = !items.length;
   document.querySelector('.drop').hidden = Boolean(items.length);
-  document.querySelector('.shelf-actions').hidden = !items.length;
+  document.querySelector('.shelf-actions').hidden = false;
+  document.querySelector('.shelf-actions [data-action="choose"]').hidden = !items.length;
+  document.querySelector('[data-action="clear"]').hidden = !items.length;
+  document.querySelector('[data-action="shelf-undo"]').hidden = !state.shelfCanUndo;
   document.querySelector('[data-live="shelf-note"]').textContent = state.shelfMessage || '';
   document.querySelector('.shelf-note').hidden = !state.shelfMessage;
   if (focused) [...list.querySelectorAll('.file-main')].find(element => element.dataset.fileID === focused)?.focus({ preventScroll: true });
+  scheduleShelfRegions();
   render();
 }
 
@@ -277,6 +348,7 @@ function openShelfMenu(ids, point, { trigger, keyboard = false } = {}) {
   if (shelfMenu.trigger) shelfMenu.trigger.setAttribute('aria-expanded', 'false');
   shelfMenu.ids = ids;
   shelfMenu.trigger = trigger;
+  scheduleShelfRegions();
   trigger.setAttribute('aria-expanded', 'true');
   shelfMenuElement.replaceChildren(...shelfMenuItems(ids).map(([command, label, enabled]) => {
     const item = document.createElement('button');
@@ -304,6 +376,7 @@ function closeShelfMenu({ restoreFocus = false, animate = true } = {}) {
   const trigger = shelfMenu.trigger;
   if (!trigger) return;
   shelfMenu.trigger = null;
+  scheduleShelfRegions();
   trigger.setAttribute('aria-expanded', 'false');
   animateMenu(shelfMenuElement, false, animate);
   if (restoreFocus && trigger.isConnected) trigger.focus({ preventScroll: true });
@@ -349,6 +422,7 @@ function receiveShelfSnapshot(value) {
   shelfSelection.selected = new Set([...shelfSelection.selected].filter(id => ids.has(id)));
   if (!ids.has(shelfSelection.anchor)) shelfSelection.anchor = null;
   state.shelfMessage = typeof value.message === 'string' ? value.message : null;
+  state.shelfCanUndo = value.canUndoRemoval === true;
   renderShelf();
 }
 
@@ -361,10 +435,11 @@ function clearSwipeMotion() {
   if (!swipeMotion) return;
   cancelAnimationFrame(swipeMotion.frame);
   swipeMotion = null;
+  scheduleShelfRegions();
   notch.classList.remove('swiping');
   // Removing inline positions must not trigger the ordinary tab fade/scale again.
   notch.classList.add('instant-view');
-  notch.style.setProperty('--tab-index', VIEWS.indexOf(state.view));
+  tabStrip.style.setProperty('--tab-index', VIEWS.indexOf(state.view));
   viewPanels.forEach(view => {
     for (const property of ['transform', 'opacity', 'filter', 'visibility', 'transition', 'will-change']) view.style.removeProperty(property);
   });
@@ -375,12 +450,12 @@ function clearSwipeMotion() {
 function paintSwipe() {
   const motion = swipeMotion;
   if (!motion) return;
-  notch.style.setProperty('--tab-index', Math.max(0, Math.min(VIEWS.length - 1, motion.position / motion.width)));
+  tabStrip.style.setProperty('--tab-index', Math.max(0, Math.min(VIEWS.length - 1, motion.position / motion.width)));
   viewPanels.forEach((view, index) => {
     const offset = index * motion.width - motion.position;
+    const visible = Math.abs(offset) < motion.width;
     const distance = Math.min(1, Math.abs(offset) / motion.width);
-    // Pages recede by fading and softening, never by scaling, so neighbours stay attached. One write per frame.
-    view.style.cssText = `transition:none;visibility:visible;will-change:transform,opacity,filter;transform:translate3d(${offset}px,0,0);opacity:${(1 - .5 * distance).toFixed(3)};filter:blur(${(2 * distance).toFixed(2)}px)`;
+    view.style.cssText = `visibility:${visible ? 'visible' : 'hidden'};transform:translate3d(${offset}px,0,0);opacity:${(1 - .5 * distance).toFixed(3)}`;
   });
 }
 
@@ -436,6 +511,7 @@ function settleSwipe(index) {
 
 function setView(view, { focus = false, animate = true, preserveSwipe = false } = {}) {
   if (!VIEWS.includes(view)) return;
+  clearBanner(true);
   if (!preserveSwipe) clearSwipeMotion();
   closeFocusMenu({ animate: false });
   closeShelfMenu({ animate: false });
@@ -443,9 +519,11 @@ function setView(view, { focus = false, animate = true, preserveSwipe = false } 
   const instant = !animate || reduced() || !state.open;
   notch.classList.toggle('instant-view', instant);
   state.view = view;
+  scheduleShelfRegions();
+  native({ action: 'viewChanged', view });
   if (view === 'shelf') shelfCommand('refresh');
   notch.dataset.view = view;
-  notch.style.setProperty('--tab-index', index);
+  if (!preserveSwipe || !swipeMotion) tabStrip.style.setProperty('--tab-index', index);
   for (const tab of tabs) {
     const selected = tab.dataset.view === view;
     tab.setAttribute('aria-selected', String(selected));
@@ -467,7 +545,7 @@ function setView(view, { focus = false, animate = true, preserveSwipe = false } 
 }
 
 function canSwipeAt(x, y) {
-  if (!state.open || !Number.isFinite(x) || !Number.isFinite(y) ||
+  if (bannerID || !state.open || !Number.isFinite(x) || !Number.isFinite(y) ||
       notch.classList.contains('dragging') || focusMenu.kind) return false;
   const target = document.elementFromPoint(x, y);
   if (!target || !panel.contains(target) || target.closest('.focus-menu, input, textarea, select, [contenteditable="true"]')) return false;
@@ -547,10 +625,11 @@ function swipeGesture(phase, dx, dy, accepted, x, y, inputTime = performance.now
 }
 
 function setOpen(open, { focus = false } = {}) {
-  if (!open) clearSwipeMotion();
+  if (!open) { clearBanner(false); clearSwipeMotion(); }
   if (!open) { closeFocusMenu({ animate: false }); closeShelfMenu({ animate: false }); }
   if (state.open === open) return;
   state.open = Boolean(open);
+  scheduleShelfRegions();
   notch.dataset.state = open ? 'open' : 'compact';
   compact.setAttribute('aria-expanded', String(open));
   panel.inert = !open;
@@ -603,6 +682,7 @@ function receiveFocusSnapshot(value) {
 
 function receiveSettingsSnapshot(value) {
   if (!value || !['spotify', 'appleMusic', 'meld'].includes(value.musicSource) || typeof value.brainFMEnabled !== 'boolean') return;
+  bridgeReady = true;
   const names = { spotify: 'Spotify', appleMusic: 'Apple Music', meld: 'Meld' };
   state.settings = { musicSource: value.musicSource, sourceName: names[value.musicSource], brainFMEnabled: value.brainFMEnabled };
   render();
@@ -667,6 +747,13 @@ function closeFocusMenu({ restoreFocus = false, animate = true } = {}) {
     const trigger = document.querySelector(`#focus-${kind}`);
     (focusLocked(state.focus) ? document.querySelector('#tab-focus') : trigger).focus({ preventScroll: true });
   }
+}
+
+function dismissMenus() {
+  const hadMenu = Boolean(focusMenu.kind || shelfMenu.trigger);
+  closeFocusMenu();
+  closeShelfMenu();
+  return hadMenu;
 }
 
 function renderFocusMenu() {
@@ -747,18 +834,28 @@ const actions = {
   'meld-open': () => native({ action: (state.music.source || state.settings.musicSource) === 'meld' ? 'meldOpen' : 'musicOpen' }),
   settings: () => native({ action: 'settingsOpen' }),
   focus() {
-    if (state.focus.interval?.state === 'awaitingNext') native({ action: 'focusIntervalsNext' });
+    if (state.focus.error) controlFocus(focusAction(state.focus));
+    else if (state.focus.interval?.state === 'awaitingNext') native({ action: 'focusIntervalsNext' });
     else controlFocus(focusAction(state.focus));
   },
   'focus-reset': () => controlFocus('reset'),
+  'focus-extend': () => controlFocus('extend'),
+  'focus-end': () => controlFocus('reset'),
   'brainfm-settings': () => native({ action: 'brainfmSettings' }),
   'brainfm-open': () => native({ action: 'brainfm' }),
   choose: () => native({ action: 'chooseFiles' }),
   clear: () => shelfCommand('clear'),
+  'shelf-paste': () => shelfCommand('paste'),
+  'shelf-undo': () => shelfCommand('undo'),
   fold: () => setOpen(false, { focus: true }),
 };
 
 document.addEventListener('click', event => {
+  if (menuDismissalTarget && menuDismissalTarget === event.target) {
+    menuDismissalTarget = null;
+    if (!event.target.closest('button, input, select, textarea, a, label, [role="button"], [data-file-id]')) return;
+  }
+  menuDismissalTarget = null;
   const action = event.target.closest?.('[data-action]')?.dataset.action;
   if (Object.hasOwn(actions, action)) { actions[action](event); return; }
   if (state.open && notch.contains(event.target) && !event.target.closest('button, input, select, textarea, a, label, [role="button"], [role="menu"], [role="dialog"], [contenteditable="true"], [tabindex]:not([tabindex="-1"]), [data-file-id]')) setOpen(false);
@@ -774,6 +871,10 @@ tabs.forEach((tab, index) => {
   });
 });
 document.addEventListener('keydown', event => {
+  if (state.open && state.view === 'shelf' && event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && !event.target.closest('input, textarea, [contenteditable="true"]')) {
+    const command = { KeyV: 'paste', KeyZ: 'undo' }[event.code];
+    if (command) { event.preventDefault(); shelfCommand(command); return; }
+  }
   if (event.key === 'Escape') {
     event.preventDefault();
     if (shelfMenu.trigger) closeShelfMenu({ restoreFocus: true });
@@ -782,9 +883,11 @@ document.addEventListener('keydown', event => {
   }
 });
 document.addEventListener('pointerdown', event => {
+  menuDismissalTarget = null;
+  if ((focusMenu.kind && !event.target.closest('.focus-menu, .focus-trigger')) || (shelfMenu.trigger && !event.target.closest('.shelf-menu, .file-menu'))) menuDismissalTarget = event.target;
   if (focusMenu.kind && !event.target.closest('.focus-menu, .focus-trigger')) closeFocusMenu();
   if (shelfMenu.trigger && !event.target.closest('.shelf-menu, .file-menu')) closeShelfMenu();
-  if (!notch.contains(event.target) && state.open) setOpen(false);
+  if (!notch.contains(event.target) && state.open && !menuDismissalTarget) setOpen(false);
 });
 document.querySelectorAll('.focus-trigger').forEach(trigger => trigger.addEventListener('keydown', event => {
   if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
@@ -846,6 +949,14 @@ document.querySelector('#focus-interval-config').addEventListener('submit', even
 });
 
 window.Lilt = Object.freeze({
+  dismissMenus,
+  selectShelfDrag(ids) {
+    if (!Array.isArray(ids)) return;
+    const known = new Set(state.shelf.map(file => file.id));
+    shelfSelection.selected = new Set(ids.filter(id => known.has(id)));
+    shelfSelection.anchor = ids[0] || null;
+    updateShelfSelection();
+  },
   configure({ hardwareWidth, hardwareHeight, hideHardwareWings, hideNotchContent, reducedMotion: reduce } = {}) {
     if (Number.isFinite(hardwareWidth)) root.style.setProperty('--hardware-width', `${Math.max(0, Math.min(500, hardwareWidth))}px`);
     if (typeof hideHardwareWings === 'boolean') notch.classList.toggle('hardware-unknown', hideHardwareWings);
@@ -861,6 +972,11 @@ window.Lilt = Object.freeze({
   setView,
   swipeTab,
   swipeGesture,
+  receiveNotificationBanner,
+  notificationTakeover(value) {
+    if (value?.id !== bannerID || typeof value.open !== 'boolean') return;
+    clearBanner(value.open, false); setOpen(value.open);
+  },
   receiveShelfSnapshot,
   receiveFocusSnapshot,
   receiveMusicSnapshot,
@@ -869,7 +985,7 @@ window.Lilt = Object.freeze({
     if (dragging) clearSwipeMotion();
     notch.classList.toggle('dragging', Boolean(dragging));
   },
-  inspect: () => structuredClone({ ...state, errors, elapsed: elapsed(), remaining: remaining() }),
+  inspect: () => structuredClone({ ...state, ready: bridgeReady, notification: { visible: Boolean(bannerID), hasText: [...bannerElement.querySelectorAll('[data-banner-source], [data-banner-title], [data-banner-body]')].some(element => Boolean(element.textContent)) }, errors, elapsed: elapsed(), remaining: remaining() }),
 });
 panel.inert = true;
 setView(state.view, { animate: false });

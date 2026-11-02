@@ -36,12 +36,17 @@
           <span class="sr" data-live="compact-label">Open the notch: Music, Meld</span>
           <span class="wing wing-right" data-compact="right" aria-hidden="true">Meld</span>
         </button>
+        <div class="notch-clip">
         <div class="notch-panel" id="notch-panel">
           <button class="notch-wings" type="button" data-action="fold" aria-label="Fold Lilt" title="Fold Lilt">
             <span class="wing" data-wing="left"><span class="mini-cover"><svg viewBox="0 0 24 24"><use href="#i-music"/></svg></span></span>
             <span class="wing wing-right" data-wing="right"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span></span>
           </button>
 
+          <section class="notification-banner" aria-label="Notification banner" hidden inert>
+            <div role="status" aria-live="polite" aria-atomic="true"><span data-banner-source></span><strong data-banner-title></strong><p data-banner-body></p></div>
+            <button type="button" class="banner-dismiss" aria-label="Dismiss notification banner">Dismiss</button>
+          </section>
           <div class="view music" id="view-music" role="tabpanel" aria-labelledby="tab-music">
             <div class="cover"><img alt="" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-music"/></svg></div>
             <div class="track-meta"><strong data-live="title">Meld</strong><span data-live="artist">Connecting…</span></div>
@@ -59,17 +64,17 @@
             <div class="focus-meta"><button id="focus-activity" class="focus-activity focus-trigger" type="button" data-action="focus-menu" data-menu="activity" aria-label="Brain.fm activity, Deep Work" aria-haspopup="menu" aria-expanded="false" aria-controls="focus-activity-menu"><span data-live="focus-activity">Deep Work</span><svg class="focus-chevron" aria-hidden="true"><use href="#i-up"/></svg></button><div class="focus-note"><span data-live="focus-note">Brain.fm</span><button class="focus-help" type="button" data-action="brainfm-settings" hidden>Open Settings</button><button class="focus-help" type="button" data-action="brainfm-open" hidden>Open Brain.fm</button></div></div>
             <div class="controls needs-js">
               <button class="icon-btn big" type="button" data-action="focus" aria-label="Start focus and Brain.fm" title="Start Brain.fm in the background"><svg><use href="#i-play" data-live="focus-icon"/></svg></button>
-              <button class="icon-btn" type="button" data-action="focus-reset" aria-label="Reset the focus timer to 25 minutes"><svg><use href="#i-reset"/></svg></button>
+              <button class="focus-extend" type="button" data-action="focus-extend" aria-label="Extend focus by five minutes" title="Add 5 minutes" hidden>+5</button><button class="focus-end" type="button" data-action="focus-end" hidden>End</button><button class="icon-btn" type="button" data-action="focus-reset" aria-label="Reset the focus timer to 25 minutes"><svg><use href="#i-reset"/></svg></button>
             </div>
             <div class="focus-menu" id="focus-activity-menu" role="menu" aria-label="Brain.fm activity" hidden><button type="button" role="menuitemradio" aria-checked="true" tabindex="-1" data-action="focus-activity" data-activity="deepWork"><span>Deep Work</span><span class="focus-menu-check" aria-hidden="true">✓</span></button><button type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-action="focus-activity" data-activity="lightWork"><span>Light Work</span><span class="focus-menu-check" aria-hidden="true">✓</span></button></div>
             <div class="focus-menu" id="focus-duration-menu" role="dialog" aria-label="Focus duration" hidden><div role="menu" aria-label="Duration presets"><button type="button" role="menuitemradio" aria-checked="true" tabindex="-1" data-action="focus-duration" data-minutes="25"><span>25 min</span><span class="focus-menu-check" aria-hidden="true">✓</span></button><button type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-action="focus-duration" data-minutes="50"><span>50 min</span><span class="focus-menu-check" aria-hidden="true">✓</span></button><button type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-action="focus-intervals"><span>Intervals…</span><span class="focus-menu-check" aria-hidden="true">✓</span></button><button type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-action="focus-custom" data-minutes="custom"><span>Custom…</span><span class="focus-menu-check" aria-hidden="true">✓</span></button></div><form id="focus-config" class="focus-config" hidden><label class="sr" for="focus-minutes">Custom duration in minutes</label><input id="focus-minutes" type="number" min="1" max="180" step="1" value="25" autocomplete="off" spellcheck="false"><span aria-hidden="true">min</span><button type="submit" aria-label="Set focus duration">Set</button></form><form id="focus-interval-config" class="focus-interval-config" hidden><label>Work <input id="focus-work-minutes" type="number" min="1" max="180" step="1" value="25"></label><label>Break <input id="focus-rest-minutes" type="number" min="1" max="180" step="1" value="5"></label><button type="submit">Set</button></form></div>
           </div>
 
           <div class="view shelf" id="view-shelf" role="tabpanel" aria-labelledby="tab-shelf" hidden>
-            <button class="drop needs-js" type="button" data-action="choose"><svg aria-hidden="true"><use href="#i-shelf"/></svg><span>Drop files here or <u>choose</u></span></button>
+            <button class="drop needs-js" type="button" data-action="choose"><svg aria-hidden="true"><use href="#i-shelf"/></svg><span>Drop files or folders, or <u>choose</u></span></button>
             <ul class="files" data-live="files" aria-label="On the shelf" tabindex="0" hidden></ul>
             <p class="shelf-note" role="status" data-live="shelf-note" hidden></p>
-            <div class="shelf-actions needs-js" hidden><button class="icon-btn" type="button" data-action="choose" aria-label="Add files" title="Add files"><svg aria-hidden="true"><use href="#i-plus"/></svg></button><button class="icon-btn" type="button" data-action="clear" aria-label="Clear Shelf" title="Clear Shelf"><svg aria-hidden="true"><use href="#i-trash"/></svg></button></div>
+            <div class="shelf-actions needs-js"><button class="shelf-command" type="button" data-action="shelf-paste" title="Paste files or folders (⌘V)">Paste</button><button class="shelf-command" type="button" data-action="shelf-undo" title="Undo removal (⌘Z)" hidden>Undo</button><button class="icon-btn" type="button" data-action="choose" aria-label="Add files" title="Add files"><svg aria-hidden="true"><use href="#i-plus"/></svg></button><button class="icon-btn" type="button" data-action="clear" aria-label="Clear Shelf" title="Clear Shelf"><svg aria-hidden="true"><use href="#i-trash"/></svg></button></div>
           </div>
 
           <div class="notch-foot needs-js">
@@ -81,6 +86,7 @@
             <button class="settings-button" type="button" data-action="settings" aria-label="Open Lilt settings" title="Settings"><svg aria-hidden="true"><use href="#i-settings"/></svg></button>
           </div>
           <div class="shelf-menu" role="menu" aria-label="File actions" tabindex="-1" hidden></div>
+        </div>
         </div>
 
       </section>

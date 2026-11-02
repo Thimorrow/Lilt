@@ -28,7 +28,11 @@ else
 fi
 swift build "${LILT_SWIFT_BUILD_ARGS[@]}"
 BIN_DIR="$(swift build "${LILT_SWIFT_BUILD_ARGS[@]}" --show-bin-path)"
-APP_DIR="$PROJECT_DIR/build/Lilt.app"
+APP_DIR="${LILT_APP_DIR:-$PROJECT_DIR/build/Lilt.app}"
+if ! [[ "$APP_DIR" = /*.app ]]; then
+  printf '%s\n' 'LILT_APP_DIR must be an absolute path ending in .app.' >&2
+  exit 2
+fi
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp "$BIN_DIR/Lilt" "$APP_DIR/Contents/MacOS/Lilt"
 if [ "$LILT_INCLUDE_MELD" = true ]; then
