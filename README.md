@@ -45,7 +45,7 @@ Lilt shows a short banner in the notch with a picture, the sender and the text: 
 3. Under **Basic Information → App-Level Tokens**, create a token with the `connections:write` scope (`xapp-…`).
 4. Paste both into Lilt and choose **Connect**.
 
-Lilt shows direct messages, group messages and channel messages that mention you. The tokens are stored only in your login Keychain. **Disconnect** removes them.
+Lilt shows direct messages, group messages and channel messages that mention you. The tokens are stored only in your login Keychain. **Disconnect** removes them. For scripted setup, pipe both tokens as two lines into `Lilt.app/Contents/MacOS/Lilt --slack-connect`, then restart Lilt.
 
 **Other apps.** Turn on **Other apps** and allow Lilt in **System Settings → Privacy & Security → Accessibility**. Lilt then mirrors the transient macOS banners of apps such as WhatsApp or Messages, with the sending app's icon. It reads only these banners through the public Accessibility API, never the Notification Center history, a database or screenshots. This relies on the macOS 26 banner layout and is experimental. While Slack is connected, Slack's own macOS banners are skipped so messages do not appear twice.
 
