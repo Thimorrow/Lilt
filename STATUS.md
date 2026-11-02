@@ -1,5 +1,30 @@
 # Status · 2026-11-02
 
+## Notch notifications: Slack, other apps, coding agents · in progress (branch native-ui)
+
+- Requested: notch banners with picture, sender and text. Sources: Slack through the user's own Slack app (Socket Mode, user token, avatar); other apps such as WhatsApp through Accessibility capture of macOS banners; Claude Code, Codex and T3 Code when an agent finishes, including its final message. User approved installing the hooks into `~/.claude/settings.json` and `~/.codex/config.toml` with backups.
+- Decisions: one shared banner owner with a short queue; agents write to `<data dir>/inbox/` through `Lilt --notify <agent>` (isolated per `--data-dir`); Slack tokens only in the Keychain, message text only in memory; existing Codex `notify` chain is preserved.
+- Acceptance: Swift tests for parsing/queue/filters; isolated rendered banner with image; a real hook run reaching an isolated instance; Slack and Accessibility live checks need the user's tokens and permission.
+- Implemented: `NotificationBanner.image` + in-memory queue (`enqueue`/`advance`); `AgentInbox` + `Lilt --notify` (main.swift) + `scripts/agent-hook.sh`; `SlackClient` (Socket Mode, Keychain, manifest prefill link); `NotificationClassifier` rewritten for the reported macOS 26 AX layout with history-panel exclusion; new Settings → Notifications section (bell icon). Sources and remaining checks in `docs/FEATURE-PLAN.md`.
+- Verification: `swift test` 178/178. Isolated bundle `local.lilt.notify` in `/tmp/lilt-notify` (`--ui-test-dir`, simulated players, `--isolate-desktop-input`): `check-native-notch.mjs` 30/30 (queued banner, app picture, agent inbox), `check-native-settings.mjs` 41/41, strict codesign passed; captures of banner, agent banner and settings inspected. Real `--notify claude` call with T3 environment rendered "T3 Code · Claude Code", project, message and T3 icon. `agent-hook.sh`: new binary writes, pre-`--notify` binary (current `build/Lilt.app`) is skipped without starting an instance, previous Codex notify chain receives the same JSON.
+- Installed (user-approved): `~/Library/Application Support/Lilt/agent-hook.sh`; extra Claude Code `Stop` hook; Codex `notify` now runs the hook first, then the former chain. Backups: `~/.claude/settings.json.bak-lilt-20261102`, `~/.codex/config.toml.bak-lilt-20261102`.
+- Delivered on request: committed on local `main` (rebased onto `origin/main` adb3202; its CGFloat fix was already contained in the native code), 178 tests passed, `build/Lilt.app` rebuilt with the existing Apple Development team signature (same bundle ID, Meld bridge included, strict codesign passed) and restarted. A probe through the installed Claude hook was consumed by the running app within two seconds; visual confirmation is the user's.
+- Open: live Slack connection (tokens, workspace approval, manifest prefill), live Accessibility dump and real WhatsApp/Messages banners, history exclusion, lock/sleep, and banner click actions are unverified. No commit or push.
+
+## Native SwiftUI interface · implemented locally (branch native-ui)
+
+- Requested: rebuild notch and settings natively with high fidelity for motion and gestures; settings keep the current custom design. No publication.
+- Implemented: `Sources/Lilt/Native/` replaces both WKWebViews. `NotchModel` / `SettingsModel` receive the same native snapshots and post the same validated messages; motion values (520 ms spring, menu, tab and page timings), swipe tracking, rubber band, haptics and critically damped settle are ported from the former CSS/JS. WebKit, `Resources/Web` and the Node UI tests are removed; their behavior checks are Swift tests. The font moved to `Resources/Fonts`.
+- Verification: 167 Swift tests passed. Isolated test bundle (`LILT_APP_DIR`, separate bundle ID, `--ui-test-dir`, simulated players, `--isolate-desktop-input`): `check-native-notch.mjs` 27/27 and `check-native-settings.mjs` 40/40; strict codesign verification of that bundle passed. Layer-rendered captures were compared with earlier web evidence and match closely.
+- Open: captures omit window shadows and are not screen recordings; real trackpad feel, VoiceOver and manual mouse use are unverified; human acceptance of motion pending. The user's `build/Lilt.app` was neither rebuilt nor stopped. Older entries below describe the former web UI.
+
+## UI polish pass · implemented locally (branch native-ui)
+
+- Requested: polish notch and settings with `emil-ui-polish`, `emil-animations` and `emil-ui-review`. Geometry, the 520 ms shell spring and page/menu timings unchanged.
+- Implemented: empty Shelf drop zone reserves the action column (Paste overlapped the dashed border); folder rows use a folder glyph; focus menus use the drawn check instead of the font `✓`; play/pause cross-fades both glyphs (0.3 scale, 3 pt blur, 350 ms bounce-free spring, off under reduced motion); track text cross-fades on change; Shelf row actions also show on keyboard focus; 0.96 press feedback and hover states on pills, banner dismiss, completion chips, check button, menu triggers, links and text buttons; switch track and knob share 230 ms; concentric inner radii in segmented groups and menus.
+- Verification: `swift test` 167/167; isolated bundle `local.lilt.polish` in `/tmp/lilt-polish` with simulated players and `--isolate-desktop-input`: fresh instance `check-native-notch.mjs` 27/27 twice, `check-native-settings.mjs` 40/40, strict codesign passed. A first notch run against an instance left in a different state by the capture script failed 4/27; the immediate rerun and both fresh runs passed. Before/after captures and a mid-swap capture were inspected locally (not committed).
+- Open: real hover/press feel, VoiceOver and trackpad use unverified; human acceptance pending. The user's `build/Lilt.app` was not rebuilt or stopped.
+
 ## Everyday improvements · implemented locally
 
 - Requested: Shelf paste, folders and undo; focus completion, +5 minutes and opt-in local timer notifications; configurable shortcut; dropdown dismissal; background reliability. Keep-awake was declined. No publication or real-player changes.

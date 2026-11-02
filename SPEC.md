@@ -33,6 +33,12 @@ Lilt is a local macOS app for music, focus and files at the screen edge. It adap
 - Keep the selected compact view across open and close. A running or completed focus session must not replace an explicitly selected Music or Shelf view. Empty panel areas, outside clicks and Escape close the panel; interactive controls stay usable.
 - Compact and expanded layouts must accommodate different notch dimensions. If screen data is missing or implausible, avoid placing text behind the physical notch. Hardware checks are separate from geometry tests.
 
+### Notifications
+
+- Show one banner at a time in the notch with picture, source, sender/title and plain text. Banners that cannot show yet wait in memory (five, two minutes). Never save notification content, tokens outside the Keychain or a history.
+- Slack through the user's own Slack app: direct and group messages and channel mentions from others, with avatar and name. Other apps through Accessibility capture of transient banners only, opt-in and never from the open history. Coding agents through `Lilt --notify`, showing the project folder and the last answer.
+- Isolated runs never capture, connect to Slack, use the Keychain or open permission settings.
+
 ### Interaction and motion
 
 - Trackpad swipes move between neighboring views. Preserve vertical Shelf scrolling, horizontal scrollable content, file drag, clicks and keyboard navigation. Do not wrap at either end. Respect the system scroll direction and reduced motion.
@@ -43,8 +49,8 @@ Lilt is a local macOS app for music, focus and files at the screen edge. It adap
 
 ## Verification
 
-- Run Swift and Node behavior tests, shell syntax checks, a release build and signature verification.
-- Check rendered UI states in an isolated WKWebView with test data. Distinguish simulated players, real player control, hardware tests and human design acceptance.
+- Run Swift behavior tests, shell syntax checks, a release build and signature verification.
+- Check rendered UI states in an isolated diagnostic instance with test data. Distinguish simulated players, real player control, hardware tests and human design acceptance.
 - Exercise real Spotify and Apple Music commands separately. Verify Brain.fm start, pause, resume, reset and restoration only when explicitly authorized.
 - Check Shelf selection, Quick Look, Finder, expiry, restart, group drag and sharing using test files. An AirDrop test needs a receiving device.
 - Test trackpad gestures, both macOS scroll directions, different MacBook notches and external displays on actual hardware. Record unavailable devices as open limits.

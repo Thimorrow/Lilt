@@ -1,22 +1,19 @@
 import AppKit
-import WebKit
+import SwiftUI
 
-final class SettingsWindowController: NSWindowController, NSWindowDelegate, WKScriptMessageHandler, WKNavigationDelegate {
-    let webView: WKWebView
+final class SettingsWindowController: NSWindowController, NSWindowDelegate {
+    let model = SettingsModel()
+    let hostView: SettingsHostView
     var onAction: (([String: Any]) -> Void)?
     var onReady: (() -> Void)?
     private(set) var ready = false
     private var shortcutMonitor: Any?
 
-    init(resources: URL) {
-        let config = WKWebViewConfiguration()
-        config.websiteDataStore = .nonPersistent()
-        config.preferences.javaScriptCanOpenWindowsAutomatically = false
-        config.preferences.tabFocusesLinks = true
-        config.setURLSchemeHandler(LocalResources(directory: resources), forURLScheme: "lilt-ui")
-        webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 820, height: 620), configuration: config)
-        webView.setValue(false, forKey: "drawsBackground")
-        let window = NSWindow(contentRect: webView.frame, styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+    init() {
+        hostView = SettingsHostView(model: model)
+        hostView.frame = NSRect(x: 0, y: 0, width: 820, height: 620)
+        hostView.sizingOptions = []
+        let window = NSWindow(contentRect: hostView.frame, styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         window.title = "Lilt Settings"
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
@@ -24,14 +21,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, WKSc
         window.appearance = NSAppearance(named: .darkAqua)
         window.minSize = NSSize(width: 700, height: 540)
         window.isReleasedWhenClosed = false
-        window.contentView = webView
+        window.contentView = hostView
         window.center()
         super.init(window: window)
         window.delegate = self
-        config.userContentController.add(self, name: "lilt")
-        webView.navigationDelegate = self
-        webView.autoresizingMask = [.width, .height]
-        webView.load(URLRequest(url: URL(string: "lilt-ui://app/settings.html")!))
+        model.post = { [weak self] body in self?.receive(body) }
     }
 
     required init?(coder: NSCoder) { nil }
@@ -40,7 +34,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, WKSc
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
-        window?.makeFirstResponder(webView)
+        window?.makeFirstResponder(hostView)
         if ready { onReady?() }
     }
 
@@ -80,24 +74,49 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, WKSc
     func windowWillClose(_ notification: Notification) { endShortcutRecording() }
     func windowDidResignKey(_ notification: Notification) { endShortcutRecording() }
 
+    /// Values cross the same JSON boundary as the former web bridge, so the model parses exactly what it would have carried.
     func send(_ method: String, value: Any) {
         guard ready, let data = try? JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed]),
-              let json = String(data: data, encoding: .utf8) else { return }
-        webView.evaluateJavaScript("window.LiltSettings?.\(method)(\(json))", completionHandler: nil)
+              let decoded = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) else { return }
+        model.receive(method, decoded)
     }
 
-    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.frameInfo.isMainFrame, message.webView === webView,
-              let body = message.body as? [String: Any], let action = body["action"] as? String else { return }
+    private func receive(_ body: [String: Any]) {
+        guard let action = body["action"] as? String else { return }
         if action == "settingsReady" { ready = true; onReady?() }
         else if action == "settingsClose" { close() }
         else { onAction?(body) }
     }
+}
 
-    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        let url = navigationAction.request.url
-        decisionHandler(url?.scheme == "lilt-ui" && url?.host == "app" ? .allow : .cancel)
+/// AppKit host for the SwiftUI settings: outside clicks dismiss an open menu, and keys reach the menu and Escape.
+final class SettingsHostView: NSHostingView<SettingsRootView> {
+    let model: SettingsModel
+
+    init(model: SettingsModel) {
+        self.model = model
+        super.init(rootView: SettingsRootView(model: model))
     }
 
-    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? { nil }
+    @MainActor required init(rootView: SettingsRootView) { fatalError("Use init(model:)") }
+    @MainActor required dynamic init?(coder: NSCoder) { fatalError("Use init(model:)") }
+
+    override var acceptsFirstResponder: Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        if model.openMenu != nil, !model.menuContains(CGPoint(x: point.x, y: isFlipped ? point.y : bounds.height - point.y)) {
+            model.closeMenu()
+        }
+        super.mouseDown(with: event)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        let keys: [UInt16: String] = [125: "down", 126: "up", 115: "home", 119: "end", 36: "return", 76: "return", 49: "return", 53: "escape", 48: "tab"]
+        if let key = keys[event.keyCode], model.menuKey(key) { return }
+        if event.keyCode == 53 { model.escape(); return }
+        super.keyDown(with: event)
+    }
+
+    override func cancelOperation(_ sender: Any?) { model.escape() }
 }

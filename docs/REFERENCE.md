@@ -2,7 +2,7 @@
 
 The original [Lilt study](https://vayun.net/studies/lilt/) was created by [Vayun Godara](https://github.com/vayungodara). It was inspected on October 30, 2026. Current attribution and licence details are in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
 
-The local interface adapts the study's notch structure, SVG icons, cover artwork, font and CSS motion. The study uses silent example tracks and a filename preview; this app adds native player controls and local file references. The original study's files include:
+The native SwiftUI interface adapts the study's notch structure, SVG icons, cover artwork, font and motion curves. The study uses silent example tracks and a filename preview; this app adds native player controls and local file references. The original study's files include:
 
 - https://vayun.net/studies/lilt/lilt.css
 - https://vayun.net/studies/lilt/lilt.js

@@ -74,11 +74,11 @@ extension AppDelegate: QLPreviewPanelDataSource, QLPreviewPanelDelegate, NSShari
             let picker = NSSharingServicePicker(items: urls)
             sharingPicker = picker
             picker.delegate = self
-            let x = max(0, min(webView.bounds.width, body["x"] as? Double ?? webView.bounds.midX))
-            let y = max(0, min(webView.bounds.height, body["y"] as? Double ?? webView.bounds.midY))
-            let point = NSPoint(x: x, y: webView.isFlipped ? y : webView.bounds.height - y)
+            let x = max(0, min(notchView.bounds.width, body["x"] as? Double ?? notchView.bounds.midX))
+            let y = max(0, min(notchView.bounds.height, body["y"] as? Double ?? notchView.bounds.midY))
+            let point = NSPoint(x: x, y: notchView.isFlipped ? y : notchView.bounds.height - y)
             selectingFiles = true
-            picker.show(relativeTo: NSRect(origin: point, size: NSSize(width: 1, height: 1)), of: webView, preferredEdge: .minY)
+            picker.show(relativeTo: NSRect(origin: point, size: NSSize(width: 1, height: 1)), of: notchView, preferredEdge: .minY)
         default: return
         }
         sendShelf()
@@ -94,19 +94,19 @@ extension AppDelegate: QLPreviewPanelDataSource, QLPreviewPanelDelegate, NSShari
                   let x = region["x"] as? Double, let y = region["y"] as? Double,
                   let width = region["width"] as? Double, let height = region["height"] as? Double,
                   [x, y, width, height].allSatisfy(\.isFinite), x >= 0, y >= 0, width > 0, height > 0,
-                  x + width <= Double(webView.bounds.width) + 1, y + height <= Double(webView.bounds.height) + 1 else { return nil }
+                  x + width <= Double(notchView.bounds.width) + 1, y + height <= Double(notchView.bounds.height) + 1 else { return nil }
             return (id, CGRect(x: x, y: y, width: width, height: height))
         }
     }
 
     func prepareShelfDrag(at point: CGPoint) {
         guard isOpen, selectedView == "shelf", !selectingFiles else { return }
-        let htmlPoint = CGPoint(x: point.x, y: webView.isFlipped ? point.y : webView.bounds.height - point.y)
-        guard let region = shelfDragRegions.first(where: { $0.frame.contains(htmlPoint) }) else { return }
+        let topLeftPoint = CGPoint(x: point.x, y: notchView.isFlipped ? point.y : notchView.bounds.height - point.y)
+        guard let region = shelfDragRegions.first(where: { $0.frame.contains(topLeftPoint) }) else { return }
         let ids = shelfDragSelection.contains(region.id) ? shelfDragSelection : [region.id]
         let urls = ids.compactMap { shelf.resolvedURL(for: $0) }
         guard urls.count == ids.count else { return }
-        webView.prepareShelfDrag(urls, ids: ids, htmlFrame: region.frame)
+        notchView.prepareShelfDrag(urls, ids: ids, frame: region.frame)
     }
 
     func pasteShelf() {

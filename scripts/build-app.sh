@@ -40,11 +40,13 @@ if [ "$LILT_INCLUDE_MELD" = true ]; then
 else
   rm -f "$APP_DIR/Contents/Resources/MeldBridge.jar"
 fi
-# Replace only this generated app's UI directory so removed assets cannot linger.
-if [ -d "$APP_DIR/Contents/Resources/Web" ]; then
-  mv "$APP_DIR/Contents/Resources/Web" "$PROJECT_DIR/build/Web.previous.$(date +%s)"
-fi
-cp -R "$PROJECT_DIR/Resources/Web" "$APP_DIR/Contents/Resources/Web"
+# Replace only this generated app's font directory (and any former Web UI directory) so removed assets cannot linger.
+for LILT_ASSET_DIR in Web Fonts; do
+  if [ -d "$APP_DIR/Contents/Resources/$LILT_ASSET_DIR" ]; then
+    mv "$APP_DIR/Contents/Resources/$LILT_ASSET_DIR" "$PROJECT_DIR/build/$LILT_ASSET_DIR.previous.$(date +%s)"
+  fi
+done
+cp -R "$PROJECT_DIR/Resources/Fonts" "$APP_DIR/Contents/Resources/Fonts"
 mkdir -p "$APP_DIR/Contents/Resources/Licenses"
 cp "$PROJECT_DIR/LICENSE" "$APP_DIR/Contents/Resources/Licenses/LICENSE"
 cp "$PROJECT_DIR/THIRD_PARTY_NOTICES.md" "$APP_DIR/Contents/Resources/Licenses/THIRD_PARTY_NOTICES.md"

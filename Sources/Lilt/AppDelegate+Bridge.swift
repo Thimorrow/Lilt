@@ -1,8 +1,7 @@
 import AppKit
-import WebKit
 
-// Routes messages from the notch and settings web views to native owners.
-extension AppDelegate: WKScriptMessageHandler, WKNavigationDelegate {
+// Routes intents from the native notch and settings window to native owners.
+extension AppDelegate {
     func handleSettingsAction(_ body: [String: Any]) {
         switch body["action"] as? String {
         case "settingsUpdate":
@@ -10,6 +9,9 @@ extension AppDelegate: WKScriptMessageHandler, WKNavigationDelegate {
             updateSettings(changes)
         case "notificationPreview": previewNotification()
         case "notificationAccessibilitySettings": notificationAccessibilitySettings()
+        case "slackConnect": connectSlack(app: body["appToken"] as? String ?? "", user: body["userToken"] as? String ?? "")
+        case "slackDisconnect": disconnectSlack()
+        case "slackCreateApp": createSlackApp()
         case "shortcutRecord":
             shortcut?.setEnabled(false)
             settingsWindow?.beginShortcutRecording()
@@ -50,9 +52,9 @@ extension AppDelegate: WKScriptMessageHandler, WKNavigationDelegate {
         }
     }
 
-    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.frameInfo.isMainFrame, message.webView === webView,
-              let body = message.body as? [String: Any], let action = body["action"] as? String else { return }
+    /// Every notch intent arrives here as a validated message dictionary, as it did across the former web bridge.
+    func handleNotchMessage(_ body: [String: Any]) {
+        guard let action = body["action"] as? String else { return }
         switch action {
         case "viewChanged":
             if let view = body["view"] as? String, ["music", "focus", "shelf"].contains(view) { selectedView = view; panelInteractionRevision += 1 }
@@ -67,7 +69,7 @@ extension AppDelegate: WKScriptMessageHandler, WKNavigationDelegate {
             guard diagnosticDirectory != nil, let code = body["keyCode"] as? UInt16, [6, 9].contains(code),
                   let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0, windowNumber: panel.windowNumber,
                     context: nil, characters: code == 6 ? "z" : "v", charactersIgnoringModifiers: code == 6 ? "z" : "v", isARepeat: false, keyCode: code) else { return }
-            _ = webView.performKeyEquivalent(with: event)
+            _ = notchView.performKeyEquivalent(with: event)
         case "ready":
             ready = true
             configureUI()
@@ -139,13 +141,5 @@ extension AppDelegate: WKScriptMessageHandler, WKNavigationDelegate {
         case "quit": quit()
         default: break
         }
-    }
-
-    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        guard let url = navigationAction.request.url, url.scheme == "lilt-ui", url.host == "app" else {
-            decisionHandler(.cancel)
-            return
-        }
-        decisionHandler(.allow)
     }
 }

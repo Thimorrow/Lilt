@@ -11,7 +11,7 @@ private final class FixtureNotificationCapture: NotificationCapturing {
         XCTAssertFalse(Thread.isMainThread)
         lock.lock(); count += 1; lock.unlock()
         _ = release.wait(timeout: .now() + 2)
-        return .init(status: .unsupported, items: [])
+        return .init(status: .active, items: [])
     }
 }
 
@@ -23,7 +23,7 @@ final class NotificationPollerTests: XCTestCase {
         DispatchQueue.main.async {
             poller.poll { result in
                 XCTAssertTrue(Thread.isMainThread)
-                XCTAssertEqual(result.status, .unsupported)
+                XCTAssertEqual(result.status, .active)
                 XCTAssertEqual(fixture.scans, 1)
                 completed.fulfill()
             }

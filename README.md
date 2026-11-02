@@ -34,15 +34,19 @@ Drag files or folders into Shelf, use **Add**, or copy them in Finder and press 
 
 New references expire after seven days by default. **Keep Longer** starts a new 30-day period. Both defaults can be changed in settings; changes do not alter existing deadlines. Removing or expiring a reference never deletes the original file. Older entries without a deadline remain until removed.
 
-### Experimental notification banners
+### Notifications
 
-In **Settings → General**, notification banners are explicitly opt-in and off by default, independently of Brain.fm Accessibility access. **Preview synthetic banner** works without capture permission. It shows one temporary plaintext banner using the existing notch animation; Dismiss, Escape or an outside click clears it. Selecting a tab takes over the panel without an expiry closing it.
+Lilt shows a short banner in the notch with a picture, the sender and the text. Banners that arrive while the notch is open wait until it closes (at most five, for two minutes). Nothing is saved.
 
-Real capture is currently blocked by an **unsupported/unverified Notification Center layout**. Lilt does not read notification content or history. Opening Accessibility settings is a separate explicit action and does not establish layout support. The intended capture target is only `com.apple.notificationcenterui`, using public Accessibility APIs, with no database, private API, Full Disk Access or screenshots. Diagnostic/smoke runs never capture, request notification permissions or open permission settings, even with opt-in saved. Session inactivity and sleep suspend the owner; complete lock-screen safety is not verified.
+- **Slack** (Settings → Notifications): **Create Slack app** opens Slack with Lilt's manifest prefilled (user scopes, Socket Mode, user message events). Install the app to your workspace, then copy the **User OAuth Token** (`xoxp-…`, OAuth & Permissions) and create an **App-Level Token** with `connections:write` (`xapp-…`, Basic Information). Paste both and choose Connect. Lilt shows direct and group messages and channel messages that mention you, with the sender's avatar. Tokens are stored only in your login Keychain. Some workspaces require an admin to approve the app.
+- **Other apps** such as WhatsApp or Messages: switch on **Other apps** and allow Lilt under System Settings → Privacy & Security → Accessibility. Lilt reads only the transient macOS banner (public Accessibility API, `com.apple.notificationcenterui`), never the Notification Center history, a database or screenshots, and shows the sending app's icon. This depends on the macOS 26 banner layout and is experimental. With the Slack app connected, Slack's system banners are skipped.
+- **Coding agents**: Claude Code (also inside T3 Code) and Codex report a finished turn with the project folder and the agent's last message. Install `scripts/agent-hook.sh` somewhere stable and add it as a Claude Code `Stop` hook (`agent-hook.sh claude`) and in front of Codex's `notify` command (`notify = ["/path/agent-hook.sh", "codex", …previous notify…]`). Set `LILT_BIN` if Lilt is not in `build/` next to the script or in `/Applications`. The hook does nothing with Lilt builds that predate `--notify`.
+
+**Preview banner** works without any permission. Dismiss, Escape or an outside click clears a banner; selecting a tab takes over the panel.
 
 ## Build from source
 
-Requires macOS 15 or later, Xcode/Swift and Node.js. CI uses Node.js 24. This build does not require Android:
+Requires macOS 15 or later and Xcode/Swift. This build does not require Android:
 
 ```sh
 git clone https://github.com/Thimorrow/Lilt.git
@@ -57,7 +61,6 @@ The command uses an ad-hoc signature. macOS permissions can need to be granted a
 
 ```sh
 swift test
-node --test scripts/test-ui.mjs scripts/test-focus.mjs scripts/test-settings.mjs scripts/test-notifications.mjs
 bash -n scripts/build-app.sh scripts/build-meld-bridge.sh
 git diff --check
 ```
@@ -66,7 +69,7 @@ Automated tests and simulated players do not prove real playback, trackpad or ha
 
 ## Project
 
-AppKit owns windows, permissions, local storage and player control. Bundled WKWebViews render the interface; Lilt does not load a remote website. Normal settings, timer state and file references are stored locally in `~/Library/Application Support/Lilt/`.
+AppKit owns windows, permissions, local storage and player control. The interface is native SwiftUI; Lilt loads no web content. Normal settings, timer state and file references are stored locally in `~/Library/Application Support/Lilt/`.
 
 - [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Release process](docs/RELEASING.md)
 - [Native/UI bridge](docs/BRIDGE.md) · [Design reference](docs/REFERENCE.md) · [Feature plan](docs/FEATURE-PLAN.md)

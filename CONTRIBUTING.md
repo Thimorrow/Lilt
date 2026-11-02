@@ -4,7 +4,7 @@ Small, focused contributions are welcome. Please discuss larger changes in an [i
 
 ## Set up
 
-You need macOS 15 or later, Xcode/Swift and Node.js. CI uses Node.js 24. Android is needed only for the optional Meld integration.
+You need macOS 15 or later and Xcode/Swift. Node.js (CI uses 24) only drives the diagnostic scripts `scripts/check-native-notch.mjs` and `scripts/check-native-settings.mjs`. Android is needed only for the optional Meld integration.
 
 ```sh
 git clone https://github.com/Thimorrow/Lilt.git
@@ -25,7 +25,6 @@ Building the bridge requires Android SDK platform 34, build tools 36.0.0 and a J
 
 ```sh
 swift test
-node --test scripts/test-ui.mjs scripts/test-focus.mjs scripts/test-settings.mjs
 bash -n scripts/build-app.sh scripts/build-meld-bridge.sh
 git diff --check
 ```

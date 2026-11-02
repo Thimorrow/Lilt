@@ -1,5 +1,4 @@
 import AppKit
-import WebKit
 import ApplicationServices
 import Quartz
 import CoreFoundation
@@ -20,8 +19,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var notificationSleeping = false
     var notificationObservers: [NSObjectProtocol] = []
     var notificationTimer: Timer?
+    let slack = SlackClient()
+    var slackNote = ""
+    var appIcons: [String: Data] = [:]
     var panel: NotchPanel!
-    var webView: NotchWebView!
+    var notchView: NotchHostView!
+    let notchModel = NotchModel()
     var statusItem: NSStatusItem!
     var pointerMonitor: Any?
     var localPointerMonitor: Any?
@@ -64,7 +67,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var outsideInteractionInFlight = false
     var panelInteractionRevision = 0
     var lastDiagnosticID = ""
-    var resourceDirectory: URL!
     let brainFM = BrainFMController()
     let smokeTest = CommandLine.arguments.contains("--smoke-test")
     var diagnosticDirectory: URL? {
@@ -168,7 +170,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         pointerMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .leftMouseUp, .rightMouseDown, .leftMouseDragged, .rightMouseDragged]) { [weak self] event in
             guard let self else { return }
             guard !self.desktopInputIsolated else { return }
-            if event.type == .leftMouseUp { self.webView.endMouseSequence() }
+            if event.type == .leftMouseUp { self.notchView.endMouseSequence() }
             self.updateMousePassthrough()
             if event.type == .leftMouseDown || event.type == .rightMouseDown {
                 guard NSScreen.screens.contains(where: { $0.frame.contains(NSEvent.mouseLocation) }) else { return }
@@ -177,16 +179,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         localPointerMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .leftMouseUp, .leftMouseDragged, .rightMouseDragged, .scrollWheel]) { [weak self] event in
             self?.updateMousePassthrough()
-            if event.type == .leftMouseUp { self?.webView.endMouseSequence() }
-            if event.type == .leftMouseDragged, self?.webView.beginShelfDrag(with: event) == true { return nil }
+            if event.type == .leftMouseUp { self?.notchView.endMouseSequence() }
+            if event.type == .leftMouseDragged, self?.notchView.beginShelfDrag(with: event) == true { return nil }
             if event.type == .scrollWheel, let self, self.isOpen, !self.selectingFiles, event.window === self.panel {
-                self.webView.observeScrollWheel(event)
+                self.notchView.observeScrollWheel(event)
             }
             if event.type == .leftMouseDown {
                 if event.window === self?.panel {
-                    if let view = self?.webView, !view.bounds.contains(view.convert(event.locationInWindow, from: nil)) { return nil }
+                    if let view = self?.notchView, !view.bounds.contains(view.convert(event.locationInWindow, from: nil)) { return nil }
                     self?.panel.permitsKey = true
-                    self?.webView.recordMouseDown(event)
+                    self?.notchView.recordMouseDown(event)
                 }
                 else if self?.isOpen == true, self?.selectingFiles == false { self?.dismissMenusOrClose() }
             }
@@ -277,65 +279,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.acceptsMouseMovedEvents = true
         panel.isReleasedWhenClosed = false
 
-        let controller = WKUserContentController()
-        controller.add(self, name: "lilt")
-        controller.addUserScript(WKUserScript(source: """
-            (() => {
-              const notch = document.getElementById('notch');
-              if (!notch) return;
-              const report = () => {
-                const r = notch.getBoundingClientRect();
-                window.webkit.messageHandlers.lilt.postMessage({action:'hitRect',x:r.x,y:r.y,width:r.width,height:r.height,radius:parseFloat(getComputedStyle(notch).borderBottomLeftRadius)||0});
-              };
-              new ResizeObserver(report).observe(notch);
-              report();
-            })();
-            """, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
-        resourceDirectory = Bundle.main.resourceURL!.appendingPathComponent("Web", isDirectory: true)
-        let config = WKWebViewConfiguration()
-        config.setURLSchemeHandler(LocalResources(directory: resourceDirectory), forURLScheme: "lilt-ui")
-        config.userContentController = controller
-        config.websiteDataStore = .nonPersistent()
-        config.preferences.javaScriptCanOpenWindowsAutomatically = false
-        config.preferences.tabFocusesLinks = true
-        webView = NotchWebView(frame: CGRect(origin: .zero, size: NotchGeometry.panelSize), configuration: config)
-        webView.setValue(false, forKey: "drawsBackground")
-        webView.registerForDraggedTypes([.fileURL])
-        webView.onFiles = { [weak self] urls in self?.addFiles(urls) }
-        webView.onShelfKeyCommand = { [weak self] command in
+        notchModel.post = { [weak self] message in self?.handleNotchMessage(message) }
+        notchView = NotchHostView(model: notchModel)
+        notchView.frame = CGRect(origin: .zero, size: NotchGeometry.panelSize)
+        notchView.registerForDraggedTypes([.fileURL])
+        notchView.onFiles = { [weak self] urls in self?.addFiles(urls) }
+        notchView.onShelfKeyCommand = { [weak self] command in
             guard let self, self.isOpen, self.selectedView == "shelf" else { return false }
             self.shelfAction(["command": command])
             return true
         }
-        webView.onShelfDragStarted = { [weak self] ids in self?.send("selectShelfDrag", value: ids) }
-        webView.onShelfMouseDown = { [weak self] point in self?.prepareShelfDrag(at: point) }
-        webView.onTabSwipeProgress = { [weak self] phase, dx, dy, accepted, point in
-            guard let self, self.ready, self.isOpen, !self.selectingFiles,
-                  point.x.isFinite, point.y.isFinite, dx.isFinite, dy.isFinite else { return }
-            self.webView.sendTabSwipeProgress(phase, dx: dx, dy: dy, accepted: accepted, point: point)
+        notchView.onShelfDragStarted = { [weak self] ids in self?.send("selectShelfDrag", value: ids) }
+        notchView.onShelfMouseDown = { [weak self] point in self?.prepareShelfDrag(at: point) }
+        notchView.canTrackSwipe = { [weak self] in
+            guard let self else { return false }
+            return self.ready && self.isOpen && !self.selectingFiles
         }
-        webView.onFileDragEntered = { [weak self] in
+        notchView.onFileDragEntered = { [weak self] in
             self?.send("setDragging", value: true)
             self?.send("setView", value: "shelf")
             self?.setOpen(true)
         }
-        webView.onFileDragExited = { [weak self] in self?.send("setDragging", value: false) }
-        webView.navigationDelegate = self
-        webView.autoresizingMask = [.width, .height]
-        webView.allowsBackForwardNavigationGestures = false
-        panel.contentView = webView
-
-        resourceDirectory = Bundle.main.resourceURL!.appendingPathComponent("Web", isDirectory: true)
-        let index = resourceDirectory.appendingPathComponent("index.html")
-        guard FileManager.default.fileExists(atPath: index.path) else {
-            let alert = NSAlert()
-            alert.messageText = "Lilt konnte seine Oberfläche nicht laden."
-            alert.informativeText = "Bitte die mit scripts/build-app.sh erstellte Lilt.app starten."
-            alert.runModal()
-            NSApp.terminate(nil)
-            return
-        }
-        webView.load(URLRequest(url: URL(string: "lilt-ui://app/index.html")!))
+        notchView.onFileDragExited = { [weak self] in self?.send("setDragging", value: false) }
+        notchView.autoresizingMask = [.width, .height]
+        panel.contentView = notchView
+        Lilt.registerFont()
+        DispatchQueue.main.async { [weak self] in self?.handleNotchMessage(["action": "ready"]) }
     }
 
     func displayID(_ screen: NSScreen) -> String? {
@@ -398,15 +367,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         settingsWindow?.send("configure", value: ["reducedMotion": NSWorkspace.shared.accessibilityDisplayShouldReduceMotion])
     }
 
+    /// Values cross the same JSON boundary as before, so the UI parses exactly what a serialized bridge would carry.
     func send(_ method: String, value: Any) {
         guard let encoded = try? JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed]),
-              let json = String(data: encoded, encoding: .utf8) else { return }
-        webView.evaluateJavaScript("window.Lilt?.\(method)(\(json))", completionHandler: nil)
+              let decoded = try? JSONSerialization.jsonObject(with: encoded, options: [.fragmentsAllowed]) else { return }
+        notchModel.receive(method, decoded)
     }
 
     func setOpen(_ value: Bool) {
         guard ready else { return }
-        if !value, webView.isDraggingShelfFiles { return }
+        if !value, notchView.isDraggingShelfFiles { return }
         panelInteractionRevision += 1
         notificationInteraction(keepOpen: value)
         isOpen = value
@@ -428,14 +398,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func dismissMenusOrClose() {
-        guard ready, isOpen, !selectingFiles, !webView.isDraggingShelfFiles, !outsideInteractionInFlight else { return }
+        guard ready, isOpen, !selectingFiles, !notchView.isDraggingShelfFiles, !outsideInteractionInFlight else { return }
         outsideInteractionInFlight = true
         let revision = panelInteractionRevision
-        webView.evaluateJavaScript("window.Lilt?.dismissMenus()") { [weak self] value, _ in
-            guard let self else { return }
-            if value as? Bool != true, revision == self.panelInteractionRevision { self.setOpen(false) }
-            DispatchQueue.main.async { self.outsideInteractionInFlight = false }
-        }
+        if !notchModel.dismissMenus(), revision == panelInteractionRevision { setOpen(false) }
+        DispatchQueue.main.async { self.outsideInteractionInFlight = false }
     }
 
     @objc func selectView(_ item: NSMenuItem) {
@@ -478,6 +445,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         snapshot["displayUnavailable"] = DisplaySelection.resolve(candidates, preferredID: settings.value.displayID)?.preferredUnavailable ?? false
         snapshot["notificationCaptureStatus"] = notificationStatus.rawValue
         snapshot["notificationCaptureMessage"] = notificationStatus.message
+        snapshot["slackStatus"] = slack.status.code
+        snapshot["slackMessage"] = slackNote.isEmpty ? slack.status.message : slackNote
         snapshot["brainFMEnabled"] = focus.brainFMEnabled
         snapshot["musicBusy"] = music?.pending != nil
         snapshot["focusLocked"] = focus.integrationLocked
@@ -518,8 +487,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc func showSettings() {
         if settingsWindow == nil {
-            let resources = Bundle.main.resourceURL!.appendingPathComponent("Web", isDirectory: true)
-            let controller = SettingsWindowController(resources: resources)
+            let controller = SettingsWindowController()
             controller.onReady = { [weak self] in
                 guard let self else { return }
                 self.settingsWindow?.send("configure", value: ["reducedMotion": NSWorkspace.shared.accessibilityDisplayShouldReduceMotion])

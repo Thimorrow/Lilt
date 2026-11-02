@@ -2,15 +2,13 @@
 
 This document records the agreed direction for Shelf, focus intervals, display support and trackpad navigation. Parts are implemented in the working tree. [STATUS.md](../STATUS.md) records the evidence and remaining checks; [SPEC.md](../SPEC.md) contains the project specification and its historical decisions.
 
-## Notification banners (experimental infrastructure; capture gated)
+## Notification banners (implemented; live checks open)
 
-Show notifications as temporary banners in the notch, without a notification history. Reuse Lilt's existing opening and closing animation unchanged. The separate liquid/resistance animation experiment was rejected and closed; do not integrate its motion controllers.
+Implemented: banners with picture, sender and text from Slack (own Slack app, Socket Mode), other apps (Accessibility capture of transient macOS banners) and coding agents (Claude Code, Codex, T3 Code), with a short in-memory queue. See `docs/BRIDGE.md`.
 
-The working tree now implements a default-off opt-in, explicit Accessibility settings action, honest capture status, synthetic Preview, typed ephemeral native owner and a transient banner inside the existing shell. No persistent notification tab or history is added. Arrival never activates a source or makes the panel key. A tab/shortcut takes ownership; expiry is identity-guarded and cannot intentionally close a user-owned panel.
+The Accessibility profile follows public macOS 26 reports, not a local dump: PingPlace issue #44 and source (`AXSystemDialog` window, `AXNotificationCenterAlert`/`AlertStack`, `widget-editor-button` for the open panel), DeeDock issue #280 (`AXNotificationCenterBanner`, `title`/`subtitle`/`body` identifiers, app name first in the description, UUID identifier, `AXNotificationListItems` in the sidebar) and the Late Night Software Sequoia thread (description-only text). Remaining checks: a live dump on the user's macOS, real WhatsApp/Messages banners, history-panel exclusion, permission revocation, sleep/lock; a live Slack workspace connection including manifest prefill and admin approval; agent hooks against a rebuilt user app.
 
-Receiving other apps' notifications remains blocked, not proven implemented. Static Notification Center metadata confirms only `com.apple.notificationcenterui`, not a transient-banner hierarchy or identifiers distinct from history. The production adapter therefore checks nonprompting trust on one serial background queue and returns permission-needed or unsupported/unverified without reading AX windows, children or text. The bounded metadata-first classifier uses explicitly fictional injected fixtures only. No fixture identifier is shipped as a macOS profile.
-
-The remaining feasibility gate is a reviewed, version-specific public AX layout that positively distinguishes a transient banner from Notification Center history before any content read. A future public AX reader must enforce the declared window/node/depth/string, per-message timeout and total elapsed budgets, followed by separately authorized controlled live checks, baseline/no-replay checks, permission revocation, sleep/session and lock-screen checks. The current session/sleep hooks do not prove complete lock safety. Synthetic UI and parser tests are not live notification evidence.
+Possible next steps: clicking a banner opens the source (Slack message, agent thread); a longer body for agent results; event-driven AX observation instead of polling.
 
 ## Notch sizes and trackpad navigation
 

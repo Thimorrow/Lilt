@@ -1,6 +1,6 @@
 # Lilt
 
-Lilt is a local macOS notch app. AppKit owns windows, permissions, storage and player control; bundled WKWebViews render the notch and settings. No remote website is loaded.
+Lilt is a local macOS notch app. AppKit owns windows, permissions, storage and player control; SwiftUI views render the notch and settings. No web content is loaded.
 
 ## Read first
 
@@ -13,13 +13,15 @@ Lilt is a local macOS notch app. AppKit owns windows, permissions, storage and p
 
 ## Build and test
 
-Requires macOS 15+, Xcode/Swift and Node.js. CI uses Node.js 24.
+Requires macOS 15+ and Xcode/Swift. Node.js (CI uses 24) only drives diagnostic scripts.
 
 ```sh
 swift test
-node --test scripts/test-ui.mjs scripts/test-focus.mjs scripts/test-settings.mjs
 bash -n scripts/build-app.sh scripts/build-meld-bridge.sh
 LILT_BUILD_MELD=0 LILT_SIGN_IDENTITY=- ./scripts/build-app.sh
+# rendered checks against an isolated diagnostic instance (--ui-test-dir DIR --simulate-meld --simulate-brainfm --isolate-desktop-input):
+node scripts/check-native-notch.mjs DIR
+node scripts/check-native-settings.mjs DIR
 codesign --verify --deep --strict build/Lilt.app
 git diff --check
 ```
@@ -33,12 +35,13 @@ Android is optional. Do not require it for Spotify, Apple Music, independent Foc
 - `FocusSession.swift`: native focus state, deadlines and restoration.
 - `SettingsStore.swift` / `SettingsWindowController.swift`: atomic settings and settings window.
 - `ShelfStore.swift`: local references; removing an entry never deletes its original file.
-- `Resources/Web/`: local interface, fonts and motion.
-- `Tests/LiltTests/` and `scripts/test-*.mjs`: automated behavior checks.
+- `Sources/Lilt/Native/`: SwiftUI notch and settings, models, motion and icons.
+- `Resources/Fonts/`: bundled Familjen Grotesk.
+- `Tests/LiltTests/` and `scripts/check-native-*.mjs`: automated behavior checks.
 
 Use native snapshots as the authority. Do not invent playback confirmation, start music during polling or source selection, or control another player through global media keys. Preserve validation, stale-response guards and optional Brain.fm behavior.
 
-Keep changes small and follow the existing Swift/JavaScript style. Preserve geometry, reduced motion, accessible names, keyboard support and settings persistence. Check rendered behavior for UI changes and distinguish it from simulated or unit-test evidence.
+Keep changes small and follow the existing Swift style. Preserve geometry, reduced motion, accessible names, keyboard support and settings persistence. Check rendered behavior for UI changes and distinguish it from simulated or unit-test evidence.
 
 ## Test data and publishing
 
