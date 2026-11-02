@@ -543,14 +543,16 @@ final class SettingsModel {
     }
 
     func inspect() -> [String: Any] {
-        state.inspect.merging([
+        // Typed separately: older Swift toolchains time out inferring this literal inline.
+        let local: [String: Any] = [
             "section": section.rawValue, "requested": requested as Any? ?? NSNull(), "localError": localError as Any? ?? NSNull(),
             "recordingShortcut": recordingShortcut, "shortcutRecordingError": shortcutRecordingError, "reducedMotion": reducedMotion,
             "openMenu": openMenu as Any? ?? NSNull(), "menuItems": openMenu.map { menuItems($0).map(\.value) } as Any? ?? NSNull(),
             "durationDraft": durationDraft as Any? ?? NSNull(), "durationError": durationError as Any? ?? NSNull(),
             "retentionCustom": retentionCustom.sorted(), "retentionErrors": retentionErrors,
             "saveStatus": saveStatus, "saveLabel": saveLabel, "errors": [String]()
-        ]) { $1 }
+        ]
+        return state.inspect.merging(local) { $1 }
     }
 
     private func announce(_ message: String) {

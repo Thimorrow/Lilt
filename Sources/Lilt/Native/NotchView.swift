@@ -302,7 +302,7 @@ private struct PagePresentation: ViewModifier {
             let distance = min(1, abs(offset) / width)
             content
                 .offset(x: offset)
-                .opacity(abs(offset) < width && !covered ? 1 - 0.5 * distance : 0)
+                .opacity(abs(offset) < width && !covered ? 1 - 0.5 * Double(distance) : 0)
                 .allowsHitTesting(false)
                 .accessibilityHidden(!active)
                 .transaction { $0.animation = nil }
